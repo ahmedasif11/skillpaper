@@ -1,0 +1,20 @@
+/* Resume Preview Styles - Ensures consistent rendering across all templates */
+
+.resume-preview-container {
+  /* Fixed preview dimensions */
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  min-height: 1122px;
+  background: #ffffff !important;
+
+  /* Contain templates */
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Prevent template styles from breaking the layout */
+.resume-preview-container * {
+  box-sizing: border-box;
+}

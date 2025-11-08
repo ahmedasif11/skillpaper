@@ -1,0 +1,32 @@
+/* Resume Preview Module Styles */
+
+.resumePreviewContainer {
+  width: 100%;
+  min-height: 1122px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+/* Override template body styles to ensure white background */
+.resumePreviewContainer :global(body) {
+  background: #ffffff !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Ensure template containers render with white background */
+.resumePreviewContainer :global(.resume-container),
+.resumePreviewContainer :global(.container) {
+  background: #ffffff !important;
+  max-width: 100% !important;
+}
+
+/* Fix Jacqueline Thompson template background */
+.resumePreviewContainer :global(html) {
+  background: #ffffff !important;
+}
+
+/* Ensure all nested elements use proper box-sizing */
+.resumePreviewContainer * {
+  box-sizing: border-box;
+}
