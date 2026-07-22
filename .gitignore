@@ -1,0 +1,5 @@
+# Cursor local agent config (skills, rules) — keep on this machine only
+.cursor/
+
+# Optional local agent instructions (duplicate of .cursor rules)
+AGENTS.md

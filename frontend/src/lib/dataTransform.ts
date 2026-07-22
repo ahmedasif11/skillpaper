@@ -1,6 +1,67 @@
 // src/lib/dataTransform.ts
-import { ResumeData } from '@/types';
-import { getTemplateConfig, TemplateConfig } from './templateConfig';
+import { getTemplateConfig } from './templateConfig';
+
+type SkillCategory = { category: string; items: string[] };
+
+function isSkillCategory(skill: unknown): skill is SkillCategory {
+  return (
+    !!skill &&
+    typeof skill === 'object' &&
+    Array.isArray((skill as SkillCategory).items)
+  );
+}
+
+function buildSkillCategories(
+  skills: any[],
+  hardSkillsList: any[],
+  softSkillsList: any[],
+  toolsList: any[]
+): SkillCategory[] {
+  const fromSkills = skills.filter(isSkillCategory).map((s) => ({
+    category: s.category || 'Skills',
+    items: s.items.map((item: any) =>
+      typeof item === 'string' ? item : item.name || String(item)
+    ),
+  }));
+
+  if (fromSkills.length > 0) {
+    return fromSkills;
+  }
+
+  const categories: SkillCategory[] = [];
+  const hard = hardSkillsList.map((s: any) => s.name || s).filter(Boolean);
+  const soft = softSkillsList.map((s: any) => s.name || s).filter(Boolean);
+  const tools = toolsList.map((s: any) => s.name || s).filter(Boolean);
+
+  if (hard.length) categories.push({ category: 'Technical Skills', items: hard });
+  if (soft.length) categories.push({ category: 'Soft Skills', items: soft });
+  if (tools.length) categories.push({ category: 'Tools', items: tools });
+
+  return categories;
+}
+
+function formatTechnologies(value: unknown): string {
+  if (!value) return '';
+  if (Array.isArray(value)) {
+    return value
+      .map((t) => (typeof t === 'string' ? t : (t as any)?.name || String(t)))
+      .filter(Boolean)
+      .join(', ');
+  }
+  return String(value);
+}
+
+function formatProjectsAsString(projects: any[]): string {
+  return projects
+    .map((proj) => {
+      const name = proj.name || proj.title || '';
+      const description = proj.description || '';
+      if (name && description) return `${name}: ${description}`;
+      return name || description;
+    })
+    .filter(Boolean)
+    .join('; ');
+}
 
 /**
  * Transform resume data for a specific template
@@ -26,7 +87,6 @@ export function transformResumeDataForTemplate(
   const softSkillsList = frontendData.softSkillsList || [];
   const toolsList = frontendData.toolsList || [];
 
-  // Create skills strings from skill lists
   const hardSkillsString = hardSkillsList
     .map((s: any) => s.name || s)
     .join(', ');
@@ -35,34 +95,62 @@ export function transformResumeDataForTemplate(
     .join(', ');
   const toolsString = toolsList.map((s: any) => s.name || s).join(', ');
 
-  // Transform experience data
-  const transformedExperience = experience.map((exp: any) => ({
-    company: exp.company || '',
-    position: exp.position || '',
-    location: exp.location || '',
-    duration:
-      exp.duration ||
-      `${exp.startDate || ''} - ${exp.current ? 'Present' : exp.endDate || ''}`,
-    responsibilities: exp.responsibilities || exp.achievements || [],
-  }));
+  const skillCategories = buildSkillCategories(
+    skills,
+    hardSkillsList,
+    softSkillsList,
+    toolsList
+  );
 
-  // Transform education data
+  // Flat skills string from non-category skill entries (legacy) or categories
+  const skillsString =
+    skills
+      .map((skill: any) => {
+        if (typeof skill === 'string') return skill;
+        if (isSkillCategory(skill)) return skill.items.join(', ');
+        return skill.name || '';
+      })
+      .filter(Boolean)
+      .join(', ') ||
+    skillCategories.map((c) => c.items.join(', ')).join(', ');
+
+  const transformedExperience = experience.map((exp: any) => {
+    const responsibilities = exp.responsibilities || exp.achievements || [];
+    const expAchievements = exp.achievements || exp.responsibilities || [];
+    return {
+      company: exp.company || '',
+      position: exp.position || '',
+      location: exp.location || '',
+      duration:
+        exp.duration ||
+        `${exp.startDate || ''} - ${exp.current ? 'Present' : exp.endDate || ''}`,
+      description: exp.description || '',
+      responsibilities,
+      achievements: expAchievements,
+      technologies: formatTechnologies(exp.technologies),
+    };
+  });
+
   const transformedEducation = education.map((edu: any) => ({
     degree: edu.degree || '',
+    field: edu.field || '',
     institution: edu.institution || '',
     location: edu.location || '',
     year: edu.year || `${edu.startDate || ''} - ${edu.endDate || ''}`,
+    gpa: edu.gpa || '',
     achievements: edu.achievements || [],
   }));
 
-  // Transform projects data
   const transformedProjects = projects.map((proj: any) => ({
     name: proj.name || proj.title || '',
     description: proj.description || '',
-    url: proj.url || proj.github || proj.link || '',
+    url: proj.url || proj.link || '',
+    github: proj.github || '',
+    technologies: formatTechnologies(proj.technologies),
+    startDate: proj.startDate || '',
+    endDate: proj.endDate || '',
   }));
 
-  // Transform languages data
   const transformedLanguages = languages.map((lang: any) => {
     if (typeof lang === 'string') {
       return {
@@ -70,60 +158,72 @@ export function transformResumeDataForTemplate(
         proficiency: lang.includes('(')
           ? lang.split(' (')[1]?.replace(')', '') || 'Intermediate'
           : 'Intermediate',
+        certification: '',
       };
     }
     return {
       language: lang.language || '',
       proficiency: lang.proficiency || 'Intermediate',
+      certification: lang.certification || '',
     };
   });
 
-  // Transform certifications data
   const transformedCertifications = certifications.map((cert: any) => {
     if (typeof cert === 'string') {
       return {
         name: cert,
         issuer: '',
         date: '',
+        credentialId: '',
+        url: '',
       };
     }
     return {
       name: cert.name || cert,
       issuer: cert.issuer || '',
       date: cert.date || '',
+      credentialId: cert.credentialId || '',
+      url: cert.url || '',
     };
   });
 
-  // Create languages string for ATS template
   const languagesString = transformedLanguages
-    .map((lang) => `${lang.language} (${lang.proficiency})`)
+    .map(
+      (lang: { language: string; proficiency: string }) =>
+        `${lang.language} (${lang.proficiency})`
+    )
     .join(', ');
 
-  // Create certifications string for ATS template
   const certificationsString = transformedCertifications
-    .map((cert) => cert.name)
+    .map((cert: { name: string }) => cert.name)
     .join(', ');
 
-  // Create skills string from skills array
-  const skillsString = skills
-    .map((skill: any) => {
-      if (typeof skill === 'string') return skill;
-      return skill.name || skill;
-    })
-    .join(', ');
+  const projectsString = formatProjectsAsString(transformedProjects);
 
-  // Determine if we need to provide a 'skills' conditional flag
-  // This is used by templates to check {{#if skills}}
   const hasAnySkills = !!(
     hardSkillsString ||
     softSkillsString ||
     toolsString ||
-    skillsString
+    skillsString ||
+    skillCategories.length
   );
 
-  // Base transformation with all possible fields
+  // skillsFormat: flat → boolean flag for {{#if skills}}; structured/hybrid → category array
+  const skillsFormat = config?.skillsFormat ?? 'flat';
+  const skillsValue =
+    skillsFormat === 'structured' || skillsFormat === 'hybrid'
+      ? skillCategories.length > 0
+        ? skillCategories
+        : undefined
+      : hasAnySkills
+        ? true
+        : undefined;
+
+  // certifications / projects: string for Jacqueline, arrays for ATS / Backend
+  const certificationsFormat = config?.certificationsFormat ?? 'array';
+  const projectsFormat = config?.projectsFormat ?? 'array';
+
   const transformedData: any = {
-    // Personal info
     name: personalInfo.name || personalInfo.fullName || '',
     title: personalInfo.title || '',
     tagline: personalInfo.tagline || '',
@@ -135,34 +235,33 @@ export function transformResumeDataForTemplate(
     github: personalInfo.github || '',
     summary: personalInfo.summary || '',
 
-    // Skills - provide both flat strings and structured arrays
-    technicalSkills: hardSkillsString, // For templates that use technicalSkills
-    hardSkills: hardSkillsString,
-    softSkills: softSkillsString,
-    tools: toolsString,
-    skills: hasAnySkills ? true : undefined, // Conditional flag for templates
+    technicalSkills: hardSkillsString || undefined,
+    hardSkills: hardSkillsString || undefined,
+    softSkills: softSkillsString || undefined,
+    tools: toolsString || undefined,
+    skills: skillsValue,
 
-    // Languages
-    languagesString: languagesString, // For templates that use flat string
-    languages: transformedLanguages, // For templates that use structured array
+    languagesString: languagesString || undefined,
+    languages: transformedLanguages,
 
-    // Certifications
-    certificationsString: certificationsString, // For templates that use flat string
-    certifications: transformedCertifications, // For templates that use structured array
+    certificationsString: certificationsString || undefined,
+    certifications:
+      certificationsFormat === 'string'
+        ? certificationsString || undefined
+        : transformedCertifications,
 
-    // Achievements
-    achievements: achievements,
+    achievements,
 
-    // Additional info
-    additionalInfo: additionalInfo,
+    additionalInfo,
 
-    // Structured data
     experience: transformedExperience,
     education: transformedEducation,
-    projects: transformedProjects,
+    projects:
+      projectsFormat === 'string'
+        ? projectsString || undefined
+        : transformedProjects,
   };
 
-  // Apply custom transformation if template config has one
   if (config?.customTransform) {
     return config.customTransform(transformedData);
   }

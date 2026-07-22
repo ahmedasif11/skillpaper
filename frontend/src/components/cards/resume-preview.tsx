@@ -1,13 +1,21 @@
 import React from 'react';
 import { ResumeData, Template } from '../../types';
 import { transformResumeDataForTemplate } from '../../lib/dataTransform';
+import { compileTemplateHtml } from '../../lib/compileTemplateHtml';
 
 interface ResumePreviewProps {
   data: Partial<ResumeData>;
   template?: Template | null;
+  /** thumbnail: hide iframe scrollbars for gallery mini-previews */
+  variant?: 'full' | 'thumbnail';
 }
 
-export function ResumePreview({ data, template }: ResumePreviewProps) {
+export function ResumePreview({
+  data,
+  template,
+  variant = 'full',
+}: ResumePreviewProps) {
+  const isThumbnail = variant === 'thumbnail';
   const {
     personalInfo,
     education,
@@ -28,167 +36,34 @@ export function ResumePreview({ data, template }: ResumePreviewProps) {
     );
   }
 
-  // If we have a template with HTML, use it for preview
+  // If we have a template with HTML, compile Handlebars (same as PDF generation)
   if (template?.html) {
     try {
-      // Transform data for template - pass template name for template-specific transformations
       const transformedData = transformResumeDataForTemplate(
         data,
         template.title
       );
 
-      // Create a simple preview by replacing template variables
-      let previewHtml = template.html;
+      let previewHtml = compileTemplateHtml(template.html, transformedData);
 
-      // Replace basic variables
-      const replacements = {
-        '{{name}}': transformedData.name || 'Your Name',
-        '{{email}}': transformedData.email || '',
-        '{{phone}}': transformedData.phone || '',
-        '{{location}}': transformedData.location || '',
-        '{{website}}': transformedData.website || '',
-        '{{linkedin}}': transformedData.linkedin || '',
-        '{{summary}}': transformedData.summary || '',
-        '{{title}}': transformedData.title || '',
-        '{{technicalSkills}}': transformedData.technicalSkills || '',
-        '{{certifications}}': transformedData.certifications || '',
-        '{{languagesString}}': transformedData.languagesString || '',
-        '{{tools}}': transformedData.tools || '',
-        '{{skills}}': transformedData.skills || '',
-      };
-
-      // Apply replacements
-      Object.entries(replacements).forEach(([key, value]) => {
-        previewHtml = previewHtml.replace(new RegExp(key, 'g'), value);
-      });
-
-      // Handle conditional sections - need to check for all types
-      previewHtml = previewHtml.replace(
-        /\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g,
-        (match, condition, content) => {
-          const value = transformedData[condition];
-          // Check if value exists and is truthy
-          if (value !== undefined && value !== null && value !== '') {
-            // If it's an array, check if it has items
-            if (Array.isArray(value)) {
-              if (value.length > 0) {
-                return content;
-              }
-            } else {
-              // For non-array values, check if they're truthy
-              return content;
-            }
+      const thumbnailOverflow = isThumbnail
+        ? `
+          html, body {
+            overflow: hidden !important;
+            height: 1122px !important;
+            max-height: 1122px !important;
           }
-          return '';
-        }
-      );
+          * {
+            scrollbar-width: none !important;
+          }
+          *::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+          }
+        `
+        : '';
 
-      // Handle experience loop
-      if (transformedData.experience && transformedData.experience.length > 0) {
-        const experienceHtml = transformedData.experience
-          .map((exp: any) => {
-            let expHtml = `
-            <div class="experience-item">
-              <div class="job-title">${exp.position}, ${exp.company}</div>
-              <div class="job-duration">${exp.duration}</div>
-              ${
-                exp.responsibilities
-                  ? `
-                <div class="job-responsibilities">
-                  ${exp.responsibilities
-                    .map(
-                      (resp: string) =>
-                        `<div class="responsibility-item">${resp}</div>`
-                    )
-                    .join('')}
-                </div>
-              `
-                  : ''
-              }
-            </div>
-          `;
-            return expHtml;
-          })
-          .join('');
-
-        previewHtml = previewHtml.replace(
-          /\{\{#each\s+experience\}\}([\s\S]*?)\{\{\/each\}\}/g,
-          experienceHtml
-        );
-      } else {
-        // Remove experience section if no data
-        previewHtml = previewHtml.replace(
-          /\{\{#if experience\}\}([\s\S]*?)\{\{\/if\}\}/g,
-          ''
-        );
-      }
-
-      // Handle education loop
-      if (transformedData.education && transformedData.education.length > 0) {
-        const educationHtml = transformedData.education
-          .map((edu: any) => {
-            let eduHtml = `
-            <div class="education-item">
-              <div class="degree">${edu.degree}</div>
-              <div class="institution">${edu.institution}</div>
-              <div class="education-year">${edu.year}</div>
-              ${
-                edu.achievements
-                  ? `
-                <div class="education-achievements">
-                  ${edu.achievements
-                    .map(
-                      (ach: string) =>
-                        `<div class="achievement-item">${ach}</div>`
-                    )
-                    .join('')}
-                </div>
-              `
-                  : ''
-              }
-            </div>
-          `;
-            return eduHtml;
-          })
-          .join('');
-
-        previewHtml = previewHtml.replace(
-          /\{\{#each\s+education\}\}([\s\S]*?)\{\{\/each\}\}/g,
-          educationHtml
-        );
-      } else {
-        // Remove education section if no data
-        previewHtml = previewHtml.replace(
-          /\{\{#if education\}\}([\s\S]*?)\{\{\/if\}\}/g,
-          ''
-        );
-      }
-
-      // Handle additional info loop
-      if (
-        transformedData.additionalInfo &&
-        transformedData.additionalInfo.length > 0
-      ) {
-        const additionalInfoHtml = transformedData.additionalInfo
-          .map((info: string) => `<div class="info-item">${info}</div>`)
-          .join('');
-
-        previewHtml = previewHtml.replace(
-          /\{\{#each\s+additionalInfo\}\}([\s\S]*?)\{\{\/each\}\}/g,
-          additionalInfoHtml
-        );
-      } else {
-        // Remove additionalInfo section if no data
-        previewHtml = previewHtml.replace(
-          /\{\{#if additionalInfo\}\}([\s\S]*?)\{\{\/if\}\}/g,
-          ''
-        );
-      }
-
-      // Clean up any remaining unprocessed Handlebars tags
-      previewHtml = previewHtml.replace(/\{\{[#\/]?\w+\}\}/g, '');
-
-      // Inject styles to override template backgrounds and ensure consistent sizing
       const styleOverride = `
         <style>
           /* Force white background and remove all extra spacing */
@@ -200,18 +75,16 @@ export function ResumePreview({ data, template }: ResumePreviewProps) {
             max-width: 100% !important;
           }
           
-          /* Normalize font size across all templates - prevent Jacqueline template from having larger text */
+          /* Normalize font size across all templates */
           html {
             font-size: 10px !important;
           }
           
-          /* Ensure body takes full width */
           body {
             box-sizing: border-box !important;
             font-size: 1rem !important;
           }
           
-          /* Override template-specific containers to remove padding */
           .resume-container, .container { 
             background: #ffffff !important; 
             max-width: 100% !important;
@@ -221,10 +94,10 @@ export function ResumePreview({ data, template }: ResumePreviewProps) {
             min-height: auto !important;
             box-sizing: border-box !important;
           }
+          ${thumbnailOverflow}
         </style>
       `;
 
-      // Insert style override before closing head tag, or at beginning if no head
       if (previewHtml.includes('</head>')) {
         previewHtml = previewHtml.replace('</head>', `${styleOverride}</head>`);
       } else {
@@ -241,6 +114,9 @@ export function ResumePreview({ data, template }: ResumePreviewProps) {
             border: 'none',
             background: '#ffffff',
             display: 'block',
+            ...(isThumbnail
+              ? { overflow: 'hidden' as const, pointerEvents: 'none' as const }
+              : {}),
           }}
           title="Resume Preview"
         />

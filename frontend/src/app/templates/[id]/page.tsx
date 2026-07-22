@@ -5,6 +5,7 @@ import { Button } from '../../../components/ui/button';
 import { Card, CardContent } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
 import { ArrowLeft, Crown } from 'lucide-react';
+import { TemplateThumbnail } from '../../../components/cards/template-thumbnail';
 import { templatesAPI } from '../../../lib/api';
 import { transformBackendTemplate } from '../../../lib/templateTransform';
 import { Template } from '../../../types';
@@ -12,6 +13,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { toast } from 'sonner';
+
 
 interface TemplateDetailsPageProps {
   params: Promise<{
@@ -85,21 +87,23 @@ export default function TemplateDetailsPage({
           </Button>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-12">
-          {/* Template Preview */}
+        <div className="grid lg:grid-cols-[1.35fr_1fr] gap-12">
+          {/* Template Preview — full scaled page, scrollable */}
           <div className="space-y-6">
             <Card className="overflow-hidden">
               <CardContent className="p-0">
                 <div className="relative">
-                  <img
-                    src={template.thumbnail}
-                    alt={template.title}
-                    className="w-full h-96 object-cover"
-                  />
+                  <div className="max-h-[min(85vh,64rem)] overflow-y-auto overflow-x-hidden bg-muted/30 p-4 sm:p-6">
+                    <TemplateThumbnail
+                      template={template}
+                      clip={false}
+                      className="shadow-sm mx-auto max-w-[794px]"
+                    />
+                  </div>
                   {template.isPro && (
                     <Badge
                       variant="secondary"
-                      className="absolute top-4 right-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0"
+                      className="absolute top-4 right-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0 z-10 pointer-events-none"
                     >
                       <Crown className="w-3 h-3 mr-1" />
                       PRO
