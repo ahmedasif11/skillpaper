@@ -22,17 +22,24 @@ import {
   shareResumeSchema,
 } from '../validation/resume.validation';
 import { authMiddleware } from '../middlewares/authMiddleware';
+import { pdfLimiter } from '../middlewares/rateLimit';
 
 const router = express.Router();
 
 // create resume (protected)
-router.post('/', authMiddleware, validate(createResumeSchema), createResume);
+router.post(
+  '/',
+  pdfLimiter,
+  authMiddleware,
+  validate(createResumeSchema),
+  createResume
+);
 
 // get user resumes (protected)
 router.get('/user', authMiddleware, getUserResumes);
 
-// cleanup old PDFs (admin function)
-router.post('/cleanup', cleanupOldPdfsEndpoint);
+// cleanup old PDFs (authenticated + CLEANUP_TOKEN)
+router.post('/cleanup', authMiddleware, cleanupOldPdfsEndpoint);
 
 // get resume (protected)
 router.get('/:id', authMiddleware, getResume);
@@ -44,10 +51,15 @@ router.put('/:id', authMiddleware, validate(updateResumeSchema), updateResume);
 router.delete('/:id', authMiddleware, deleteResume);
 
 // regenerate PDF (protected)
-router.post('/:id/regenerate', authMiddleware, regenerateResumePdf);
+router.post(
+  '/:id/regenerate',
+  pdfLimiter,
+  authMiddleware,
+  regenerateResumePdf
+);
 
 // preview PDF (protected)
-router.get('/:id/preview', authMiddleware, previewResumePdf);
+router.get('/:id/preview', pdfLimiter, authMiddleware, previewResumePdf);
 
 // download pdf (protected)
 router.get('/:id/download', authMiddleware, downloadResume);

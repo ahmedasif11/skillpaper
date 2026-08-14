@@ -8,15 +8,16 @@ import {
 import { validate } from '../middlewares/validate';
 import { createTemplateSchema } from '../validation/template.validation';
 import { authMiddleware } from '../middlewares/authMiddleware';
+import { requireAdmin } from '../middlewares/adminMiddleware';
 
 const router = express.Router();
 
 router.get('/', listTemplates);
 router.get('/:id', getTemplate);
-// protect createTemplate — requires auth (you can extend for admin)
 router.post(
   '/',
   authMiddleware,
+  requireAdmin,
   validate(createTemplateSchema),
   createTemplate
 );

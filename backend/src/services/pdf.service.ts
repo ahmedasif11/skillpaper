@@ -10,6 +10,42 @@ const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_TEMPLATE_SIZE = 1024 * 1024; // 1MB
 const PDF_TIMEOUT = 30000; // 30 seconds
 
+export function getPdfOutputDir(): string {
+  return path.join(os.tmpdir(), 'resume-maker');
+}
+
+/**
+ * Resolve a stored PDF path only if it stays under the PDF output directory.
+ */
+export function resolveStoredPdfPath(storedPath: string): string | null {
+  if (!storedPath) return null;
+  const outDir = path.resolve(getPdfOutputDir());
+  const resolved = path.resolve(storedPath);
+  const relative = path.relative(outDir, resolved);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    return null;
+  }
+  return resolved;
+}
+
+/**
+ * Return the on-disk PDF if it still exists under the output dir.
+ * Otherwise regenerate from template HTML + stored resume data.
+ */
+export async function ensurePdfFile(
+  storedPath: string | undefined,
+  templateHtml: string,
+  data: unknown
+): Promise<{ filePath: string; regenerated: boolean }> {
+  const existing = storedPath ? resolveStoredPdfPath(storedPath) : null;
+  if (existing && fs.existsSync(existing)) {
+    return { filePath: existing, regenerated: false };
+  }
+
+  const { filePath } = await generatePdfFromTemplate(templateHtml, data);
+  return { filePath, regenerated: true };
+}
+
 /**
  * Render HTML with Handlebars and convert to PDF buffer using Puppeteer.
  * Returns: { buffer, filePath }
@@ -39,7 +75,7 @@ export async function generatePdfFromTemplate(templateHtml: string, data: any) {
   const finalHtml = compiled(data || {});
 
   // Ensure output dir
-  const outDir = path.join(os.tmpdir(), 'resume-maker');
+  const outDir = getPdfOutputDir();
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
   let browser;
@@ -146,7 +182,7 @@ export async function generatePdfPreview(
  */
 export function cleanupOldPdfs(): void {
   try {
-    const outDir = path.join(os.tmpdir(), 'resume-maker');
+    const outDir = getPdfOutputDir();
     if (!fs.existsSync(outDir)) return;
 
     const files = fs.readdirSync(outDir);

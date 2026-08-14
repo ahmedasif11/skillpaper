@@ -33,10 +33,13 @@ export const getTemplate = async (req: Request, res: Response) => {
 
 /**
  * POST /api/templates
- * (Admin or protected in your app — currently open)
+ * Admin-only (authMiddleware + requireAdmin). Templates are also seeded via seedDatabase.ts.
  */
 export const createTemplate = async (req: Request, res: Response) => {
   try {
+    if (!req.user?.isAdmin) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
     const { name, description, category, preview, html, isActive } = req.body;
     const template = new Template({
       name,

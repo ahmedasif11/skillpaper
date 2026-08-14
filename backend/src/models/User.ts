@@ -5,6 +5,7 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password: string; // hashed
+  isAdmin: boolean;
   profileData?: any; // User's default resume data for auto-fill
   createdAt: Date;
   updatedAt: Date;
@@ -21,6 +22,7 @@ const UserSchema: Schema<IUser> = new Schema(
       trim: true,
     },
     password: { type: String, required: true },
+    isAdmin: { type: Boolean, default: false },
     profileData: { type: Schema.Types.Mixed }, // User's default resume data for auto-fill
   },
   { timestamps: true }

@@ -1,6 +1,7 @@
 // src/controllers/resume.controller.ts
 import { Request, Response } from 'express';
-import Resume from '../models/Resume';
+import crypto from 'crypto';
+import Resume, { IResume } from '../models/Resume';
 import Template from '../models/Template';
 import User from '../models/User';
 import {
@@ -8,9 +9,11 @@ import {
   generatePdfPreview,
   deletePdfFile,
   cleanupOldPdfs,
+  ensurePdfFile,
 } from '../services/pdf.service';
-import path from 'path';
 import fs from 'fs';
+import { isValidObjectId } from '../utils/objectId';
+import { isResumeOwner } from '../utils/assertResumeOwner';
 
 /**
  * POST /api/resumes
@@ -57,11 +60,23 @@ export const createResume = async (req: Request, res: Response) => {
  */
 export const getResume = async (req: Request, res: Response) => {
   try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: 'Unauthorized' });
+
     const { id } = req.params;
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ message: 'Invalid resume id' });
+    }
+
     const resume = await Resume.findById(id)
       .populate('template')
       .populate('user', '-password');
     if (!resume) return res.status(404).json({ message: 'Resume not found' });
+
+    if (!isResumeOwner(resume, String(user._id))) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
     res.json({ resume });
   } catch (err) {
     console.error(err);
@@ -95,16 +110,22 @@ export const getUserResumes = async (req: Request, res: Response) => {
  */
 export const downloadResume = async (req: Request, res: Response) => {
   try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: 'Unauthorized' });
+
     const { id } = req.params;
-    const resume = await Resume.findById(id);
-    if (!resume || !resume.pdfUrl)
-      return res.status(404).json({ message: 'PDF not found' });
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ message: 'Invalid resume id' });
+    }
 
-    const filePath = resume.pdfUrl;
-    if (!fs.existsSync(filePath))
-      return res.status(404).json({ message: 'File not found on server' });
+    const resume = await Resume.findById(id).populate('template');
+    if (!resume) return res.status(404).json({ message: 'Resume not found' });
 
-    res.download(filePath, `resume-${resume._id}.pdf`);
+    if (!isResumeOwner(resume, String(user._id))) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    return streamResumePdf(resume, res, `resume-${resume._id}.pdf`);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -293,6 +314,12 @@ export const deleteResume = async (req: Request, res: Response) => {
  */
 export const cleanupOldPdfsEndpoint = async (req: Request, res: Response) => {
   try {
+    const expected = process.env.CLEANUP_TOKEN?.trim() ?? '';
+    const provided = req.header('x-cleanup-token') ?? '';
+    if (!expected || !timingSafeEqualString(expected, provided)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
     cleanupOldPdfs();
     res.json({ message: 'Old PDF files cleaned up successfully' });
   } catch (err) {
@@ -300,6 +327,13 @@ export const cleanupOldPdfsEndpoint = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+function timingSafeEqualString(expected: string, provided: string): boolean {
+  const expectedBuf = Buffer.from(expected);
+  const providedBuf = Buffer.from(provided);
+  if (expectedBuf.length !== providedBuf.length) return false;
+  return crypto.timingSafeEqual(expectedBuf, providedBuf);
+}
 
 /**
  * POST /api/resumes/:id/share
@@ -324,8 +358,7 @@ export const shareResume = async (req: Request, res: Response) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Generate share token
-    const shareToken = Math.random().toString(36).substr(2, 15);
+    const shareToken = crypto.randomBytes(32).toString('hex');
     const shareExpiresAt = new Date();
     shareExpiresAt.setDate(shareExpiresAt.getDate() + expiresInDays);
 
@@ -430,7 +463,7 @@ export const getPublicResume = async (req: Request, res: Response) => {
 export const downloadPublicResume = async (req: Request, res: Response) => {
   try {
     const { shareToken } = req.params;
-    const resume = await Resume.findOne({ shareToken });
+    const resume = await Resume.findOne({ shareToken }).populate('template');
 
     if (!resume) {
       return res.status(404).json({ message: 'Shared resume not found' });
@@ -441,20 +474,38 @@ export const downloadPublicResume = async (req: Request, res: Response) => {
       return res.status(410).json({ message: 'Shared link has expired' });
     }
 
-    if (!resume.pdfUrl || !fs.existsSync(resume.pdfUrl)) {
-      return res.status(404).json({ message: 'PDF not found' });
-    }
-
-    // Set appropriate headers for public download
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="resume-${resume.data.name || 'shared'}.pdf"`
-    );
+    const filename = `resume-${resume.data.name || 'shared'}.pdf`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/pdf');
 
-    res.download(resume.pdfUrl, `resume-${resume.data.name || 'shared'}.pdf`);
+    return streamResumePdf(resume, res, filename);
   } catch (err) {
     console.error('Download public resume error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+async function streamResumePdf(
+  resume: IResume,
+  res: Response,
+  filename: string
+) {
+  const template = resume.template as { html?: string } | undefined;
+  const html =
+    template && typeof template === 'object' ? template.html : undefined;
+  if (!html) {
+    return res.status(404).json({ message: 'Template not found' });
+  }
+
+  const { filePath, regenerated } = await ensurePdfFile(
+    resume.pdfUrl,
+    html,
+    resume.data
+  );
+  if (regenerated) {
+    resume.pdfUrl = filePath;
+    await resume.save();
+  }
+
+  return res.download(filePath, filename);
+}

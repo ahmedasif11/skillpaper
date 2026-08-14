@@ -2,8 +2,7 @@
 import { NextFunction, Response, Request } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'replace_this_in_prod';
+import { getJwtSecret } from '../config/jwt';
 
 export const authMiddleware = async (
   req: Request,
@@ -16,7 +15,7 @@ export const authMiddleware = async (
       return res.status(401).json({ message: 'No token provided' });
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET) as {
+    const decoded = jwt.verify(token, getJwtSecret()) as {
       userId: string;
       iat?: number;
       exp?: number;

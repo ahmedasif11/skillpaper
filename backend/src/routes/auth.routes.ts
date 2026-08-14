@@ -7,14 +7,17 @@ import {
   updateProfile,
 } from '../controllers/auth.controller';
 import { authMiddleware } from '../middlewares/authMiddleware';
+import { authLimiter } from '../middlewares/rateLimit';
+import { validate } from '../middlewares/validate';
+import { registerSchema } from '../validation/auth.validation';
 
 const router = express.Router();
 
 // POST /api/auth/register
-router.post('/register', register);
+router.post('/register', authLimiter, validate(registerSchema), register);
 
 // POST /api/auth/login
-router.post('/login', login);
+router.post('/login', authLimiter, login);
 
 // GET /api/auth/profile
 router.get('/profile', authMiddleware, getProfile);

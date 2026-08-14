@@ -15,12 +15,6 @@ export const register = async (req: Request, res: Response) => {
   try {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
-      return res
-        .status(400)
-        .json({ message: 'Name, email and password are required' });
-    }
-
     // Check existing
     const existing = await User.findOne({ email: email.toLowerCase().trim() });
     if (existing)
