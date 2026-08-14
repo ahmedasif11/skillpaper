@@ -3,6 +3,7 @@ import cors from 'cors';
 import authRoutes from './routes/auth.routes';
 import templateRoutes from './routes/template.routes';
 import resumeRoutes from './routes/resume.routes';
+import uploadedResumeRoutes from './routes/uploadedResume.routes';
 import { globalApiLimiter } from './middlewares/rateLimit';
 
 const app = express();
@@ -38,6 +39,7 @@ app.use('/api', globalApiLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/resumes', resumeRoutes);
+app.use('/api/uploaded-resumes', uploadedResumeRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true });

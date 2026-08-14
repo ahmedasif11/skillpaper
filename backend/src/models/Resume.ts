@@ -9,6 +9,7 @@ export interface IResume extends Document {
   isPublic?: boolean;
   shareToken?: string;
   shareExpiresAt?: Date;
+  sourceUploadedResumeId?: mongoose.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,9 +23,16 @@ const ResumeSchema: Schema<IResume> = new Schema(
     isPublic: { type: Boolean, default: false },
     shareToken: { type: String, unique: true, sparse: true },
     shareExpiresAt: { type: Date },
+    sourceUploadedResumeId: {
+      type: Schema.Types.ObjectId,
+      ref: 'UploadedResume',
+      default: null,
+    },
   },
   { timestamps: true }
 );
+
+ResumeSchema.index({ sourceUploadedResumeId: 1 });
 
 const Resume: Model<IResume> =
   mongoose.models.Resume || mongoose.model<IResume>('Resume', ResumeSchema);

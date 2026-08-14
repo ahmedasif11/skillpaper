@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
+import { resetContainerForTests } from '../container';
 
 let mongoServer: MongoMemoryServer;
 
@@ -9,6 +10,7 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  resetContainerForTests();
   const db = mongoose.connection.db;
   if (!db) return;
   const collections = await db.collections();
