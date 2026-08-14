@@ -1,10 +1,11 @@
 // src/server.ts (excerpt to mount auth routes)
 import express from 'express';
 import dotenv from 'dotenv';
+import path from 'path';
 import cors from 'cors';
 import connectDB from './config/db';
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 connectDB();
 
 const app = express();
@@ -43,5 +44,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/resumes', resumeRoutes);
 
+app.get('/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+app.listen(Number(PORT), '0.0.0.0', () =>
+  console.log(`Server running on ${PORT}`)
+);

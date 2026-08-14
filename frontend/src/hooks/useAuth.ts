@@ -89,6 +89,7 @@ export const useAuth = () => {
   };
 
   const isTokenValid = () => {
+    if (typeof window === 'undefined') return false;
     const token = localStorage.getItem('resumeBuilder_token');
     if (!token) return false;
 

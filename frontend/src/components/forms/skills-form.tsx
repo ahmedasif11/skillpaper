@@ -80,7 +80,7 @@ export function SkillsForm({
           {skills.length > 0 ? (
             skills.map((skill, index) => (
               <div key={skill.id} className="flex gap-2 items-start">
-                <div className="flex-1 space-y-2">
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-[1fr_10rem] gap-2">
                   <Input
                     value={skill.name}
                     onChange={(e) =>

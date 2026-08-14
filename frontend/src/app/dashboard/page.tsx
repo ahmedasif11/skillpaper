@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, FileText, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
+import { Plus, FileText, LayoutTemplate, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import {
   Card,
@@ -12,15 +12,15 @@ import { Alert, AlertDescription } from '../../components/ui/alert';
 import ResumeCard from '../../components/cards/resume-card';
 import ErrorBoundary from '../../components/common/error-boundary';
 import ProtectedRoute from '../../components/common/protected-route';
-import LoadingSpinner from '../../components/common/loading-spinner';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { User, Resume } from '../../types';
+import { Resume } from '../../types';
 import { useRouter } from 'next/navigation';
 import { resumesAPI } from '../../lib/api';
 import { useErrorHandler } from '../../hooks/useErrorHandler';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { toast } from 'sonner';
+import { Skeleton } from '../../components/ui/skeleton';
 
 export default function DashboardPage() {
   const [resumes, setResumes] = useState<Resume[]>([]);
@@ -30,7 +30,6 @@ export default function DashboardPage() {
   const { handleError, isError, error, clearError } = useErrorHandler();
   const { user } = useAuthContext();
 
-  // Load resumes
   const loadResumes = async () => {
     try {
       setIsLoading(true);
@@ -45,12 +44,10 @@ export default function DashboardPage() {
     }
   };
 
-  // Load resumes when component mounts (user is guaranteed to be available due to ProtectedRoute)
   useEffect(() => {
     loadResumes();
   }, []);
 
-  // Refresh resumes
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -63,7 +60,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Handle resume actions
   const handleViewResume = (id: string) => {
     router.push(`/resume/preview?id=${id}`);
   };
@@ -79,14 +75,13 @@ export default function DashboardPage() {
   return (
     <ProtectedRoute>
       <ErrorBoundary>
-        <div className="min-h-screen py-8">
+        <div className="py-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Header */}
             <div className="mb-8">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-3xl font-bold mb-2">
-                    Welcome back{user && user.name ? `, ${user.name}` : ''}!
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-2xl sm:text-3xl font-bold mb-2 break-words">
+                    Welcome back{user?.name ? `, ${user.name}` : ''}!
                   </h1>
                   <p className="text-muted-foreground">
                     Manage your resumes and create new ones
@@ -97,7 +92,7 @@ export default function DashboardPage() {
                   size="sm"
                   onClick={handleRefresh}
                   disabled={isRefreshing}
-                  className="flex items-center gap-2"
+                  className="self-start sm:self-auto"
                 >
                   <RefreshCw
                     className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
@@ -107,7 +102,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Error Alert */}
             {isError && error && (
               <Alert variant="destructive" className="mb-6">
                 <AlertCircle className="h-4 w-4" />
@@ -125,15 +119,14 @@ export default function DashboardPage() {
               </Alert>
             )}
 
-            {/* Quick Actions */}
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg">Create New Resume</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Start building a new resume with our professional templates
+                    Start from a professional template with a live preview
                   </p>
                   <Button asChild className="w-full">
                     <Link href="/templates">
@@ -146,30 +139,15 @@ export default function DashboardPage() {
 
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Recent Resumes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Continue working on your recent resumes
-                  </p>
-                  <Button variant="outline" className="w-full">
-                    <FileText className="mr-2 h-4 w-4" />
-                    View All
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
                   <CardTitle className="text-lg">Templates</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Browse our collection of professional templates
+                    Browse the catalog and preview layouts before you write
                   </p>
                   <Button variant="outline" className="w-full" asChild>
                     <Link href="/templates">
-                      <Calendar className="mr-2 h-4 w-4" />
+                      <LayoutTemplate className="mr-2 h-4 w-4" />
                       Browse Templates
                     </Link>
                   </Button>
@@ -177,10 +155,9 @@ export default function DashboardPage() {
               </Card>
             </div>
 
-            {/* Resumes Grid */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">
+            <div className="mb-8" id="your-resumes">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold">
                   Your Resumes ({resumes.length})
                 </h2>
                 <Button asChild>
@@ -192,11 +169,13 @@ export default function DashboardPage() {
               </div>
 
               {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <LoadingSpinner size="lg" text="Loading resumes..." />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[0, 1, 2].map((key) => (
+                    <Skeleton key={key} className="h-56 w-full rounded-xl" />
+                  ))}
                 </div>
               ) : resumes.length > 0 ? (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {resumes.map((resume) => (
                     <ResumeCard
                       key={resume._id}

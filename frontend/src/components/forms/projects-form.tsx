@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -20,6 +20,19 @@ export function ProjectsForm({ data, onChange }: ProjectsFormProps) {
   const [newTechnology, setNewTechnology] = useState<{ [key: string]: string }>(
     {}
   );
+
+  useEffect(() => {
+    setProjectsList(
+      (data || []).map((project, index) => ({
+        ...project,
+        id: (project as any).id || `proj-${index}`,
+        title: (project as any).title || project.name || '',
+        technologies: Array.isArray(project.technologies)
+          ? project.technologies
+          : [],
+      }))
+    );
+  }, [data]);
 
   const handleAddProject = () => {
     const newProject: Project = {
@@ -58,9 +71,9 @@ export function ProjectsForm({ data, onChange }: ProjectsFormProps) {
     const tech = newTechnology[projectId]?.trim();
     if (!tech) return;
 
-    const project = projectsList.find((p) => p.id === projectId);
-    if (project && !project.technologies.includes(tech)) {
-      const updatedTechnologies = [...project.technologies, tech];
+    const project = projectsList.find((p) => (p as any).id === projectId);
+    if (project && !(project.technologies || []).includes(tech)) {
+      const updatedTechnologies = [...(project.technologies || []), tech];
       handleProjectChange(projectId, 'technologies', updatedTechnologies);
     }
     setNewTechnology((prev) => ({ ...prev, [projectId]: '' }));
@@ -69,7 +82,7 @@ export function ProjectsForm({ data, onChange }: ProjectsFormProps) {
   const handleRemoveTechnology = (projectId: string, tech: string) => {
     const project = projectsList.find((p) => p.id === projectId);
     if (project) {
-      const updatedTechnologies = project.technologies.filter(
+      const updatedTechnologies = (project.technologies || []).filter(
         (t) => t !== tech
       );
       handleProjectChange(projectId, 'technologies', updatedTechnologies);
@@ -135,7 +148,7 @@ export function ProjectsForm({ data, onChange }: ProjectsFormProps) {
             <div className="space-y-2">
               <Label>Technologies Used</Label>
               <div className="flex flex-wrap gap-2 mb-2">
-                {project.technologies.map((tech) => (
+                {(project.technologies || []).map((tech) => (
                   <Badge
                     key={tech}
                     variant="secondary"

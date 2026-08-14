@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -29,6 +29,17 @@ export function EducationForm({ data, onChange }: EducationFormProps) {
           },
         ]
   );
+
+  useEffect(() => {
+    if (data.length > 0) {
+      setEducationList(
+        data.map((edu, index) => ({
+          ...edu,
+          id: (edu as any).id || `edu-${index}`,
+        })) as Education[]
+      );
+    }
+  }, [data]);
 
   const handleAddEducation = () => {
     const newEducation: Education = {

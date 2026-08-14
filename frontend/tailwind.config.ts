@@ -1,6 +1,7 @@
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
+  darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -55,6 +56,12 @@ const config: Config = {
         md: 'var(--radius-md)',
         sm: 'var(--radius-sm)',
         xl: 'var(--radius-xl)',
+      },
+      minHeight: {
+        touch: '44px',
+      },
+      minWidth: {
+        touch: '44px',
       },
     },
   },

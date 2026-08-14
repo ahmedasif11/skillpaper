@@ -29,7 +29,7 @@ interface TemplateThumbnailProps {
  */
 export function TemplateThumbnail({
   template,
-  heightClassName = 'h-[32rem]',
+  heightClassName = 'h-64 sm:h-72 lg:h-80',
   scale: scaleOverride,
   clip = true,
   className = '',

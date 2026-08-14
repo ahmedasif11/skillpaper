@@ -1,11 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Download, Edit3, Save, Share2 } from 'lucide-react';
-import { ResumePreview } from '@/components/cards/resume-preview';
+import {
+  ArrowLeft,
+  Download,
+  Edit3,
+  Save,
+  Share2,
+  MoreHorizontal,
+  Check,
+  Circle,
+} from 'lucide-react';
+import { ScaledResumePreview } from '@/components/cards/scaled-resume-preview';
 import { PersonalInfoForm } from '@/components/forms/personal-info-form';
 import { EducationForm } from '@/components/forms/education-form';
 import { ExperienceForm } from '@/components/forms/experience-form';
@@ -16,152 +25,105 @@ import { templatesAPI, resumesAPI, authAPI } from '@/lib/api';
 import { transformBackendTemplate } from '@/lib/templateTransform';
 import { transformResumeDataForTemplate } from '@/lib/dataTransform';
 import {
-  Template,
-  PersonalInfo,
-  Education,
-  Experience,
-  Skill,
-  Project,
-} from '@/types';
+  hydrateFormFromStoredData,
+  createEmptyResumeFormData,
+  getTemplateIdFromResume,
+  isPersistedResumeId,
+} from '@/lib/hydrateResumeForm';
+import { Template, PersonalInfo } from '@/types';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { useAuthContext } from '@/contexts/AuthContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import LoadingSpinner from '@/components/common/loading-spinner';
 import './resume-preview.css';
 
-export default function ResumePreviewPage() {
+function ResumePreviewPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const templateId = searchParams.get('template');
+  const templateIdParam = searchParams.get('template');
   const resumeId = searchParams.get('id');
-  const { isAuthenticated, user } = useAuthContext();
+  const { isAuthenticated } = useAuthContext();
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingSection, setEditingSection] = useState<string>('personal');
   const [template, setTemplate] = useState<Template | null>(null);
+  const [resolvedTemplateId, setResolvedTemplateId] = useState<string | null>(
+    templateIdParam
+  );
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [persistedId, setPersistedId] = useState<string | null>(
+    isPersistedResumeId(resumeId) ? resumeId : null
+  );
 
-  const [currentResumeData, setCurrentResumeData] = useState<Partial<any>>({
-    personalInfo: {
-      name: '',
-      email: '',
-      phone: '',
-      location: '',
-      summary: '',
-      title: '',
-      tagline: '',
-      website: '',
-      linkedin: '',
-    },
-    education: [],
-    experience: [],
-    hardSkillsList: [],
-    softSkillsList: [],
-    toolsList: [],
-    projects: [],
-    languages: [],
-    certifications: [],
-    achievements: [],
-    additionalInfo: [],
-  });
+  const [currentResumeData, setCurrentResumeData] = useState<any>(
+    createEmptyResumeFormData()
+  );
 
   useEffect(() => {
-    // Load resume data from localStorage
-    const savedData = localStorage.getItem('resumeData');
-    if (savedData) {
-      try {
-        const parsedData = JSON.parse(savedData);
-        // Ensure we have the proper structure
-        setCurrentResumeData({
-          personalInfo: parsedData.personalInfo || {
-            name: '',
-            email: '',
-            phone: '',
-            location: '',
-            summary: '',
-            title: '',
-            tagline: '',
-            website: '',
-            linkedin: '',
-          },
-          education: parsedData.education || [],
-          experience: parsedData.experience || [],
-          hardSkillsList: parsedData.hardSkillsList || [],
-          softSkillsList: parsedData.softSkillsList || [],
-          toolsList: parsedData.toolsList || [],
-          projects: parsedData.projects || [],
-          languages: parsedData.languages || [],
-          certifications: parsedData.certifications || [],
-          achievements: parsedData.achievements || [],
-          additionalInfo: parsedData.additionalInfo || [],
-        });
-      } catch (error) {
-        console.error('Error parsing saved resume data:', error);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    const fetchTemplate = async () => {
+    const load = async () => {
       try {
         setLoading(true);
-        console.log('🔍 Fetching template with ID:', templateId);
+        let nextTemplateId = templateIdParam;
+        let loadedFromApi = false;
 
-        if (templateId) {
-          const response = await templatesAPI.getById(templateId);
-          console.log('✅ Template fetched:', response.template?.name);
-
-          if (response.template) {
-            const transformedTemplate = transformBackendTemplate(
-              response.template
-            );
-            setTemplate(transformedTemplate);
-          } else {
-            console.warn('⚠️ No template in response');
+        if (isPersistedResumeId(resumeId)) {
+          try {
+            const response = await resumesAPI.getById(resumeId!);
+            const resume = response.resume || response;
+            if (resume?.data) {
+              setCurrentResumeData(hydrateFormFromStoredData(resume.data));
+              loadedFromApi = true;
+              setPersistedId(resume._id || resumeId);
+              setUpdatedAt(resume.updatedAt || resume.createdAt || null);
+            }
+            const fromResume = getTemplateIdFromResume(resume);
+            if (fromResume) nextTemplateId = fromResume;
+          } catch (err) {
+            console.error('Error loading resume:', err);
           }
-        } else {
-          console.warn('⚠️ No template ID provided');
-          // Try to get template ID from localStorage if available
+        }
+
+        if (!loadedFromApi) {
           const savedData = localStorage.getItem('resumeData');
           if (savedData) {
-            try {
-              const parsed = JSON.parse(savedData);
-              if (parsed.templateId) {
-                console.log(
-                  '📦 Found template ID in localStorage:',
-                  parsed.templateId
-                );
-                const response = await templatesAPI.getById(parsed.templateId);
-                if (response.template) {
-                  const transformedTemplate = transformBackendTemplate(
-                    response.template
-                  );
-                  setTemplate(transformedTemplate);
-                }
-              }
-            } catch (e) {
-              console.error('Error parsing localStorage:', e);
+            const parsed = JSON.parse(savedData);
+            setCurrentResumeData(hydrateFormFromStoredData(parsed));
+            if (!nextTemplateId && parsed.templateId) {
+              nextTemplateId = parsed.templateId;
             }
           }
         }
-      } catch (err: any) {
-        console.error('❌ Error fetching template:', err);
-        console.error('Error details:', {
-          message: err.message,
-          status: err.status,
-          templateId: templateId,
-        });
-        toast.error('Failed to load template. Using default preview.');
+
+        if (nextTemplateId) {
+          const response = await templatesAPI.getById(nextTemplateId);
+          if (response.template) {
+            setTemplate(transformBackendTemplate(response.template));
+            setResolvedTemplateId(nextTemplateId);
+          }
+        }
+      } catch (err) {
+        console.error('Error loading preview:', err);
+        toast.error('Failed to load preview data.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchTemplate();
-  }, [templateId]);
+    load();
+  }, [templateIdParam, resumeId]);
 
   const handleDownloadPDF = async () => {
     try {
-      if (!templateId) {
+      if (!resolvedTemplateId) {
         toast.error('No template selected');
         return;
       }
@@ -172,7 +134,6 @@ export default function ResumePreviewPage() {
         return;
       }
 
-      // Validate required fields
       const requiredFields = [];
       if (!currentResumeData.personalInfo?.name) requiredFields.push('Name');
       if (!currentResumeData.personalInfo?.email) requiredFields.push('Email');
@@ -187,34 +148,23 @@ export default function ResumePreviewPage() {
         return;
       }
 
-      // Transform the data for the backend - pass template name for template-specific transformations
       const transformedData = transformResumeDataForTemplate(
         currentResumeData,
         template?.title
       );
 
-      console.log('📄 Transformed data for backend:', transformedData);
-      console.log('📄 Template ID:', templateId);
-
+      setDownloading(true);
       toast.loading('Creating your resume...');
 
-      // Create resume in backend
       const response = await resumesAPI.create({
-        templateId: templateId,
+        templateId: resolvedTemplateId,
         data: transformedData,
       });
 
-      console.log('✅ Resume created:', response.resume);
-
       if (response.resume && response.resume._id) {
+        setPersistedId(response.resume._id);
         toast.loading('Generating PDF...');
-
-        // Download the PDF
         const pdfBlob = await resumesAPI.download(response.resume._id);
-
-        console.log('📥 PDF downloaded, size:', pdfBlob.size);
-
-        // Create download link
         const url = window.URL.createObjectURL(pdfBlob);
         const link = document.createElement('a');
         link.href = url;
@@ -223,36 +173,28 @@ export default function ResumePreviewPage() {
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-
         toast.dismiss();
         toast.success('PDF downloaded successfully!');
       } else {
         throw new Error('Resume creation failed - no resume ID returned');
       }
     } catch (error: any) {
-      console.error('❌ Error downloading PDF:', error);
-      console.error('Error details:', {
-        message: error.message,
-        status: error.status,
-        details: error.details,
-      });
+      console.error('Error downloading PDF:', error);
       toast.dismiss();
-
-      // More detailed error message
       if (error.status === 400) {
-        const errorMsg =
-          error.details?.message || error.message || 'Invalid resume data';
-        toast.error(`${errorMsg}. Please check all required fields.`);
+        toast.error(
+          `${error.details?.message || error.message || 'Invalid resume data'}. Please check all required fields.`
+        );
       } else if (error.status === 404) {
         toast.error('Template not found. Please refresh and try again.');
       } else if (error.status === 401) {
         toast.error('Please log in to download your resume');
         router.push('/login');
       } else {
-        toast.error(
-          error.message || 'Failed to download PDF. Please try again.'
-        );
+        toast.error(error.message || 'Failed to download PDF. Please try again.');
       }
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -262,36 +204,67 @@ export default function ResumePreviewPage() {
         toast.error('Please log in to save your resume data');
         return;
       }
-
-      // Save resume data to user profile for auto-fill in future
       await authAPI.updateProfile(currentResumeData);
-
+      if (isPersistedResumeId(persistedId)) {
+        const transformedData = transformResumeDataForTemplate(
+          currentResumeData,
+          template?.title
+        );
+        await resumesAPI.update(persistedId!, transformedData);
+      }
+      localStorage.setItem(
+        'resumeData',
+        JSON.stringify({
+          ...currentResumeData,
+          templateId: resolvedTemplateId,
+          templateName: template?.title,
+        })
+      );
       toast.success('Resume data saved successfully!');
       setIsEditing(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving profile:', error);
       toast.error('Failed to save resume data. Please try again.');
     }
   };
 
-  const handleShare = () => {
-    // In a real app, this would generate a shareable link
-    const shareData = {
-      title: `${currentResumeData.personalInfo?.fullName}'s Resume`,
-      text: 'Check out my resume',
-      url: window.location.href,
-    };
-
-    if (navigator.share) {
-      navigator.share(shareData);
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      toast.success('Resume link copied to clipboard!');
+  const handleShare = async () => {
+    const name = currentResumeData.personalInfo?.name || 'My';
+    if (!isAuthenticated) {
+      toast.error('Sign in to create a public share link');
+      router.push('/login');
+      return;
+    }
+    if (!isPersistedResumeId(persistedId)) {
+      toast.error('Download the PDF once to save this resume, then share it.');
+      return;
+    }
+    try {
+      setSharing(true);
+      const response = await resumesAPI.share(persistedId!, 30);
+      const publicUrl = response.shareToken
+        ? `${window.location.origin}/resume/public/${response.shareToken}`
+        : response.shareUrl;
+      if (navigator.share) {
+        await navigator.share({
+          title: `${name}'s Resume`,
+          text: 'Check out my resume',
+          url: publicUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(publicUrl);
+        toast.success('Public share link copied to clipboard');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Could not create a share link');
+    } finally {
+      setSharing(false);
     }
   };
 
   const updateResumeData = (field: string, value: any) => {
-    setCurrentResumeData((prev) => ({
+    setCurrentResumeData((prev: any) => ({
       ...prev,
       [field]: value,
     }));
@@ -372,89 +345,130 @@ export default function ResumePreviewPage() {
     { key: 'experience', label: 'Experience' },
     { key: 'skills', label: 'Skills' },
     { key: 'projects', label: 'Projects' },
-    { key: 'extras', label: 'Languages & Certifications' },
+    { key: 'extras', label: 'Extras' },
   ];
+
+  const sectionStatus = [
+    {
+      label: 'Personal Info',
+      done: Boolean(currentResumeData.personalInfo?.name),
+    },
+    {
+      label: 'Experience',
+      done: (currentResumeData.experience || []).length > 0,
+    },
+    {
+      label: 'Education',
+      done: (currentResumeData.education || []).length > 0,
+    },
+    {
+      label: 'Skills',
+      done:
+        (currentResumeData.hardSkillsList || []).length > 0 ||
+        (currentResumeData.softSkillsList || []).length > 0,
+    },
+    {
+      label: 'Projects',
+      done: (currentResumeData.projects || []).length > 0,
+    },
+  ];
+
+  const editHref = resolvedTemplateId
+    ? `/resume/form?template=${resolvedTemplateId}${persistedId ? `&id=${persistedId}` : resumeId ? `&id=${resumeId}` : ''}`
+    : `/resume/form${resumeId ? `?id=${resumeId}` : ''}`;
 
   if (loading) {
     return (
-      <div className="min-h-screen py-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary dark:border-white mx-auto"></div>
-            <p className="text-muted-foreground mt-4">Loading preview...</p>
-          </div>
-        </div>
+      <div className="py-16">
+        <LoadingSpinner size="lg" text="Loading preview..." />
       </div>
     );
   }
 
+  const hasData = Boolean(currentResumeData.personalInfo?.name || template);
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              asChild
-              className="flex items-center space-x-2"
-            >
+    <div className="bg-background">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button variant="ghost" asChild>
               <Link href="/dashboard">
                 <ArrowLeft className="h-4 w-4 text-foreground" />
-                <span>Back to Dashboard</span>
+                <span className="hidden sm:inline">Dashboard</span>
+                <span className="sm:hidden">Back</span>
               </Link>
             </Button>
-            <div>
-              <h1 className="text-2xl font-semibold">Resume Preview</h1>
-              <p className="text-muted-foreground">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-semibold">
+                Resume Preview
+              </h1>
+              <p className="text-muted-foreground text-sm truncate">
                 {template
-                  ? `Using ${template.title} template`
-                  : 'Resume Preview'}
+                  ? `Using ${template.title}`
+                  : 'Preview your resume'}
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Button
-              variant="outline"
-              size="sm"
-              onClick={handleShare}
-              className="flex items-center space-x-2"
-            >
-              <Share2 className="h-4 w-4" />
-              <span>Share</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsEditing(!isEditing)}
-              className="flex items-center space-x-2"
-            >
-              <Edit3 className="h-4 w-4" />
-              <span>{isEditing ? 'Cancel Edit' : 'Edit Data'}</span>
-            </Button>
-            <Button
-              size="sm"
+              className="flex-1 sm:flex-none"
               onClick={handleDownloadPDF}
-              className="flex items-center space-x-2"
+              disabled={downloading}
             >
               <Download className="h-4 w-4" />
-              <span>Download PDF</span>
+              {downloading ? 'Downloading…' : 'Download PDF'}
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="More actions">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="z-[60]">
+                <DropdownMenuItem onClick={handleShare} disabled={sharing}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share public link
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsEditing(!isEditing)}>
+                  <Edit3 className="h-4 w-4 mr-2" />
+                  {isEditing ? 'Close editor' : 'Edit data'}
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={editHref}>
+                    <Edit3 className="h-4 w-4 mr-2" />
+                    Open builder
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Left Side - Edit Form or Info */}
-          <div className="space-y-6">
+        {!hasData && (
+          <Card className="mb-6">
+            <CardContent className="py-8 text-center">
+              <p className="text-muted-foreground mb-4">
+                No resume data found. Open a resume from the dashboard or start
+                from a template.
+              </p>
+              <Button asChild>
+                <Link href="/templates">Browse templates</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-8">
+          <div className="order-2 lg:order-1 space-y-6 min-w-0">
             {isEditing ? (
               <>
-                {/* Section Navigation */}
                 <Card>
                   <CardHeader>
                     <CardTitle>Edit Resume Sections</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {sections.map((section) => (
                         <Button
                           key={section.key}
@@ -465,7 +479,7 @@ export default function ResumePreviewPage() {
                           }
                           size="sm"
                           onClick={() => setEditingSection(section.key)}
-                          className="justify-start"
+                          className="justify-start whitespace-normal h-auto py-2"
                         >
                           {section.label}
                         </Button>
@@ -473,11 +487,9 @@ export default function ResumePreviewPage() {
                     </div>
                   </CardContent>
                 </Card>
-
-                {/* Edit Form */}
                 <Card>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <CardTitle>
                         Edit{' '}
                         {sections.find((s) => s.key === editingSection)?.label}
@@ -492,44 +504,49 @@ export default function ResumePreviewPage() {
                 </Card>
               </>
             ) : (
-              <Card>
+              <Card className="hidden lg:block">
                 <CardHeader>
                   <CardTitle>Resume Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-1">
+                    <h2 className="font-medium text-sm text-muted-foreground mb-1">
                       Template
-                    </h4>
-                    <p>{template?.title || 'Unknown Template'}</p>
+                    </h2>
+                    <p>{template?.title || 'Unknown template'}</p>
                   </div>
+                  {updatedAt && (
+                    <div>
+                      <h2 className="font-medium text-sm text-muted-foreground mb-1">
+                        Last updated
+                      </h2>
+                      <p>{new Date(updatedAt).toLocaleDateString()}</p>
+                    </div>
+                  )}
                   <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-1">
-                      Last Updated
-                    </h4>
-                    <p>{new Date().toLocaleDateString()}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-sm text-muted-foreground mb-1">
-                      Sections Completed
-                    </h4>
+                    <h2 className="font-medium text-sm text-muted-foreground mb-2">
+                      Sections
+                    </h2>
                     <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Personal Info</span>
-                        <span className="text-green-600">✓</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Experience</span>
-                        <span className="text-green-600">✓</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Education</span>
-                        <span className="text-green-600">✓</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Skills</span>
-                        <span className="text-green-600">✓</span>
-                      </div>
+                      {sectionStatus.map((section) => (
+                        <div
+                          key={section.label}
+                          className="flex justify-between text-sm items-center"
+                        >
+                          <span>{section.label}</span>
+                          {section.done ? (
+                            <Check
+                              className="h-4 w-4 text-primary"
+                              aria-label="Complete"
+                            />
+                          ) : (
+                            <Circle
+                              className="h-4 w-4 text-muted-foreground"
+                              aria-label="Incomplete"
+                            />
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </CardContent>
@@ -537,19 +554,35 @@ export default function ResumePreviewPage() {
             )}
           </div>
 
-          {/* Right Side - Resume Preview */}
-          <div className="lg:sticky lg:top-8 lg:h-fit">
-            <div className="border border-border rounded-xl overflow-hidden bg-white dark:bg-gray-900">
-              <div className="px-6 pt-6 border-b border-border bg-background">
-                <h3 className="text-lg font-semibold mb-4">Resume Preview</h3>
+          <div className="order-1 lg:order-2 lg:sticky lg:top-24 lg:h-fit min-w-0 overflow-x-hidden">
+            <div className="border border-border rounded-xl overflow-hidden bg-muted/30">
+              <div className="px-4 sm:px-6 py-4 border-b border-border bg-card">
+                <h2 className="text-lg font-semibold">Resume Preview</h2>
               </div>
-              <div className="overflow-hidden">
-                <ResumePreview data={currentResumeData} template={template} />
+              <div className="p-2 sm:p-4 overflow-x-hidden">
+                <ScaledResumePreview
+                  data={currentResumeData}
+                  template={template}
+                />
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResumePreviewPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-16">
+          <LoadingSpinner text="Loading preview..." />
+        </div>
+      }
+    >
+      <ResumePreviewPage />
+    </Suspense>
   );
 }

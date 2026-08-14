@@ -46,6 +46,7 @@ export async function generatePdfFromTemplate(templateHtml: string, data: any) {
   try {
     // Launch puppeteer with better options
     browser = await puppeteer.launch({
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',

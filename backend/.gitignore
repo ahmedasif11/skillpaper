@@ -7,7 +7,6 @@
 /data
 /config
 /scripts
-/src/scripts
 .env
 .env.example
 .env.local

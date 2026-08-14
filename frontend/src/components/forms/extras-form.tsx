@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Plus, X } from 'lucide-react';
 import { AchievementsForm } from './achievements-form';
@@ -28,32 +27,39 @@ export function ExtrasForm({
   onAchievementsChange,
   onAdditionalInfoChange,
 }: ExtrasFormProps) {
+  const languageLabels = (languages || []).map((item: any) =>
+    typeof item === 'string' ? item : item?.language || String(item)
+  );
+  const certificationLabels = (certifications || []).map((item: any) =>
+    typeof item === 'string' ? item : item?.name || String(item)
+  );
   const [newLanguage, setNewLanguage] = useState('');
   const [newCertification, setNewCertification] = useState('');
+  const [newAdditional, setNewAdditional] = useState('');
 
   const handleAddLanguage = () => {
     const lang = newLanguage.trim();
-    if (lang && !languages.includes(lang)) {
-      onLanguagesChange([...languages, lang]);
+    if (lang && !languageLabels.includes(lang)) {
+      onLanguagesChange([...languageLabels, lang]);
     }
     setNewLanguage('');
   };
 
   const handleRemoveLanguage = (language: string) => {
-    onLanguagesChange(languages.filter((lang) => lang !== language));
+    onLanguagesChange(languageLabels.filter((lang) => lang !== language));
   };
 
   const handleAddCertification = () => {
     const cert = newCertification.trim();
-    if (cert && !certifications.includes(cert)) {
-      onCertificationsChange([...certifications, cert]);
+    if (cert && !certificationLabels.includes(cert)) {
+      onCertificationsChange([...certificationLabels, cert]);
     }
     setNewCertification('');
   };
 
   const handleRemoveCertification = (certification: string) => {
     onCertificationsChange(
-      certifications.filter((cert) => cert !== certification)
+      certificationLabels.filter((cert) => cert !== certification)
     );
   };
 
@@ -101,7 +107,7 @@ export function ExtrasForm({
           <div className="space-y-2">
             <Label>Languages You Speak</Label>
             <div className="flex flex-wrap gap-2 mb-2">
-              {languages.map((language) => (
+              {languageLabels.map((language) => (
                 <div
                   key={language}
                   className="flex items-center gap-1 bg-secondary text-secondary-foreground px-3 py-1 rounded-md"
@@ -118,18 +124,19 @@ export function ExtrasForm({
                 </div>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 value={newLanguage}
                 onChange={(e) => setNewLanguage(e.target.value)}
                 placeholder="e.g., English (Native), Spanish (Conversational)"
-                onKeyPress={handleLanguageKeyPress}
+                onKeyDown={handleLanguageKeyPress}
               />
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={handleAddLanguage}
+                className="shrink-0"
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add
@@ -152,7 +159,7 @@ export function ExtrasForm({
           <div className="space-y-2">
             <Label>Professional Certifications</Label>
             <div className="flex flex-wrap gap-2 mb-2">
-              {certifications.map((certification) => (
+              {certificationLabels.map((certification) => (
                 <div
                   key={certification}
                   className="flex items-center gap-1 bg-secondary text-secondary-foreground px-3 py-1 rounded-md"
@@ -169,18 +176,19 @@ export function ExtrasForm({
                 </div>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 value={newCertification}
                 onChange={(e) => setNewCertification(e.target.value)}
                 placeholder="e.g., AWS Certified Developer, PMP, Google Analytics Certified"
-                onKeyPress={handleCertificationKeyPress}
+                onKeyDown={handleCertificationKeyPress}
               />
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={handleAddCertification}
+                className="shrink-0"
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add
@@ -239,20 +247,19 @@ export function ExtrasForm({
               </div>
             ))}
 
-            <div className="flex space-x-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 placeholder="Add additional information..."
                 className="flex-1"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    const input = e.target as HTMLInputElement;
-                    if (input.value.trim()) {
-                      onAdditionalInfoChange([
-                        ...additionalInfo,
-                        input.value.trim(),
-                      ]);
-                      input.value = '';
-                    }
+                value={newAdditional}
+                onChange={(e) => setNewAdditional(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newAdditional.trim()) {
+                    onAdditionalInfoChange([
+                      ...additionalInfo,
+                      newAdditional.trim(),
+                    ]);
+                    setNewAdditional('');
                   }
                 }}
               />
@@ -260,19 +267,17 @@ export function ExtrasForm({
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  const input = document.querySelector(
-                    'input[placeholder="Add additional information..."]'
-                  ) as HTMLInputElement;
-                  if (input && input.value.trim()) {
+                  if (newAdditional.trim()) {
                     onAdditionalInfoChange([
                       ...additionalInfo,
-                      input.value.trim(),
+                      newAdditional.trim(),
                     ]);
-                    input.value = '';
+                    setNewAdditional('');
                   }
                 }}
               >
                 <Plus className="h-4 w-4" />
+                Add
               </Button>
             </div>
           </div>

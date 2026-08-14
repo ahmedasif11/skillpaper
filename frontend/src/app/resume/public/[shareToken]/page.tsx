@@ -78,10 +78,10 @@ export default function PublicResumePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-[calc(100svh-8rem)] flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p>Loading shared resume...</p>
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading shared resume...</p>
         </div>
       </div>
     );
@@ -89,11 +89,11 @@ export default function PublicResumePage() {
 
   if (isError || !resume) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-[calc(100svh-8rem)] flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-red-500" />
+              <AlertCircle className="h-5 w-5 text-destructive" />
               Resume Not Found
             </CardTitle>
           </CardHeader>
@@ -104,7 +104,7 @@ export default function PublicResumePage() {
                   'This shared resume could not be found or may have expired.'}
               </AlertDescription>
             </Alert>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Button variant="outline" onClick={() => router.back()}>
                 <ArrowLeft className="h-4 w-4 mr-2 text-foreground" />
                 Go Back
@@ -120,11 +120,11 @@ export default function PublicResumePage() {
   }
 
   return (
-    <div className="min-h-screen py-8">
+    <div className="py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <Button variant="outline" onClick={() => router.back()}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Go Back
@@ -134,7 +134,9 @@ export default function PublicResumePage() {
               Shared Resume
             </Badge>
           </div>
-          <h1 className="text-3xl font-bold mb-2">{resume.name}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2 break-words">
+            {resume.name}
+          </h1>
           {resume.title && (
             <p className="text-xl text-muted-foreground mb-4">{resume.title}</p>
           )}

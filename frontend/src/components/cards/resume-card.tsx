@@ -108,7 +108,10 @@ export default function ResumeCard({
     setIsLoading('share');
     try {
       const response = await resumesAPI.share(resume._id, 30);
-      setShareUrl(response.shareUrl);
+      const publicUrl = response.shareToken
+        ? `${window.location.origin}/resume/public/${response.shareToken}`
+        : response.shareUrl;
+      setShareUrl(publicUrl);
       toast.success('Share link created successfully');
     } catch (error) {
       handleError(error);
@@ -133,19 +136,6 @@ export default function ResumeCard({
     }
   };
 
-  const copyShareUrl = async () => {
-    if (shareUrl) {
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        setShareCopied(true);
-        toast.success('Share link copied to clipboard');
-        setTimeout(() => setShareCopied(false), 2000);
-      } catch (error) {
-        toast.error('Failed to copy share link');
-      }
-    }
-  };
-
   const confirmDelete = async () => {
     setIsLoading('delete');
     try {
@@ -162,8 +152,28 @@ export default function ResumeCard({
 
   const templateName =
     typeof resume.template === 'object'
-      ? resume.template.name
+      ? (resume.template as any).name ||
+        (resume.template as any).title ||
+        'Unknown Template'
       : 'Unknown Template';
+
+  const existingShare =
+    shareUrl ||
+    (resume.isPublic && resume.shareToken
+      ? `${typeof window !== 'undefined' ? window.location.origin : ''}/resume/public/${resume.shareToken}`
+      : '');
+
+  const copyShareUrl = async () => {
+    if (!existingShare) return;
+    try {
+      await navigator.clipboard.writeText(existingShare);
+      setShareCopied(true);
+      toast.success('Share link copied to clipboard');
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy share link');
+    }
+  };
 
   return (
     <Card className="hover:shadow-lg transition-shadow duration-200">
@@ -173,23 +183,25 @@ export default function ResumeCard({
             <CardTitle className="text-lg font-semibold text-foreground">
               {resume.data.name || 'Untitled Resume'}
             </CardTitle>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Template: {templateName}
             </p>
             {resume.data.title && (
-              <p className="text-sm text-gray-500 mt-1">{resume.data.title}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {resume.data.title}
+              </p>
             )}
           </div>
           <div className="flex items-center gap-2">
             {resume.isPublic && (
-              <Badge variant="default" className="bg-green-100 text-green-800">
+              <Badge variant="secondary">
                 <Share2 className="h-3 w-3 mr-1" />
                 Shared
               </Badge>
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="icon" aria-label="Resume actions">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -264,7 +276,7 @@ export default function ResumeCard({
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                      <Trash2 className="h-4 w-4 mr-2 text-red-600" />
+                      <Trash2 className="h-4 w-4 mr-2 text-destructive" />
                       Delete
                     </DropdownMenuItem>
                   </AlertDialogTrigger>
@@ -281,7 +293,7 @@ export default function ResumeCard({
                       <AlertDialogAction
                         onClick={confirmDelete}
                         disabled={isLoading === 'delete'}
-                        className="bg-red-600 hover:bg-red-700"
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
                         {isLoading === 'delete' ? (
                           <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -301,37 +313,46 @@ export default function ResumeCard({
 
       <CardContent className="pt-0">
         <div className="space-y-3">
-          <div className="flex items-center text-sm text-gray-500">
-            <Calendar className="h-4 w-4 mr-2" />
+          <div className="flex items-center text-sm text-muted-foreground">
+            <Calendar className="h-4 w-4 mr-2 shrink-0" />
             <span>
               Created: {new Date(resume.createdAt).toLocaleDateString()}
             </span>
           </div>
 
-          <div className="flex items-center text-sm text-gray-500">
-            <FileText className="h-4 w-4 mr-2" />
+          <div className="flex items-center text-sm text-muted-foreground">
+            <FileText className="h-4 w-4 mr-2 shrink-0" />
             <span>
               Updated: {new Date(resume.updatedAt).toLocaleDateString()}
             </span>
           </div>
 
-          {shareUrl && (
-            <div className="p-2 bg-blue-50 rounded border border-blue-200">
-              <p className="text-xs text-blue-600 font-medium mb-1">
+          {existingShare && (
+            <div className="p-2 bg-muted rounded border border-border">
+              <p className="text-xs text-muted-foreground font-medium mb-1">
                 Share Link:
               </p>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
-                  value={shareUrl}
+                  value={existingShare}
                   readOnly
-                  className="flex-1 text-xs p-1 border rounded bg-white"
+                  className="flex-1 min-w-0 text-xs p-2 border border-input rounded bg-background text-foreground"
                 />
                 <Button
                   variant="outline"
-                  size="sm"
-                  onClick={copyShareUrl}
-                  className="text-xs px-2 py-1"
+                  size="icon"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(existingShare);
+                      setShareCopied(true);
+                      toast.success('Share link copied to clipboard');
+                      setTimeout(() => setShareCopied(false), 2000);
+                    } catch {
+                      toast.error('Failed to copy share link');
+                    }
+                  }}
+                  aria-label="Copy share link"
                 >
                   {shareCopied ? (
                     <Check className="h-3 w-3" />
@@ -343,14 +364,14 @@ export default function ResumeCard({
             </div>
           )}
 
-          <div className="flex gap-2 pt-2">
+          <div className="flex flex-wrap gap-2 pt-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => onView(resume._id)}
-              className="flex-1"
+              className="flex-1 min-w-[5.5rem]"
             >
-              <Eye className="h-4 w-4 mr-2" />
+              <Eye className="h-4 w-4" />
               View
             </Button>
 
@@ -358,9 +379,9 @@ export default function ResumeCard({
               variant="outline"
               size="sm"
               onClick={() => onEdit(resume._id)}
-              className="flex-1"
+              className="flex-1 min-w-[5.5rem]"
             >
-              <Edit className="h-4 w-4 mr-2" />
+              <Edit className="h-4 w-4" />
               Edit
             </Button>
 
@@ -369,12 +390,12 @@ export default function ResumeCard({
               size="sm"
               onClick={handleDownload}
               disabled={isLoading === 'download'}
-              className="flex-1"
+              className="flex-1 min-w-[5.5rem]"
             >
               {isLoading === 'download' ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                <RefreshCw className="h-4 w-4 animate-spin" />
               ) : (
-                <Download className="h-4 w-4 mr-2" />
+                <Download className="h-4 w-4" />
               )}
               Download
             </Button>

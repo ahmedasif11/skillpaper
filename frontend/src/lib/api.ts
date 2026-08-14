@@ -52,12 +52,25 @@ api.interceptors.response.use(
       apiError.message =
         data.message || `Server Error: ${error.response.status}`;
 
+      const requestUrl = `${error.config?.baseURL || ''}${error.config?.url || ''}`;
+      const isAuthAttempt = /\/auth\/(login|register)(?:\?|$)/.test(
+        requestUrl
+      );
+
       switch (error.response.status) {
         case 401:
-          // Clear token and redirect to login
+          if (isAuthAttempt) {
+            apiError.message =
+              data.message || 'Invalid email or password. Please try again.';
+            break;
+          }
+          // Session expired on a protected request — sign out and send to login
           localStorage.removeItem('resumeBuilder_token');
           localStorage.removeItem('resumeBuilder_user');
-          if (typeof window !== 'undefined') {
+          if (
+            typeof window !== 'undefined' &&
+            !window.location.pathname.startsWith('/login')
+          ) {
             window.location.href = '/login';
           }
           break;

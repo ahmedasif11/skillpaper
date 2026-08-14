@@ -11,9 +11,9 @@ import { transformBackendTemplate } from '../../../lib/templateTransform';
 import { Template } from '../../../types';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import { toast } from 'sonner';
-
+import LoadingSpinner from '../../../components/common/loading-spinner';
+import { Skeleton } from '../../../components/ui/skeleton';
 
 interface TemplateDetailsPageProps {
   params: Promise<{
@@ -21,11 +21,35 @@ interface TemplateDetailsPageProps {
   }>;
 }
 
+const BEST_FOR: Record<string, string[]> = {
+  Professional: [
+    'Corporate Roles',
+    'Management Positions',
+    'Finance & Consulting',
+    'Business Development',
+  ],
+  Creative: ['Design Roles', 'Marketing', 'Creative Director', 'Agency Work'],
+  Tech: [
+    'Software Engineering',
+    'Data Science',
+    'Product Management',
+    'DevOps',
+  ],
+  Academic: [
+    'Research Positions',
+    'University Roles',
+    'Scientific Roles',
+    'PhD Applications',
+  ],
+  Minimal: ['Any Industry', 'Clean Aesthetic', 'Entry Level', 'Career Changers'],
+};
+
 export default function TemplateDetailsPage({
   params,
 }: TemplateDetailsPageProps) {
   const [template, setTemplate] = useState<Template | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notFoundTemplate, setNotFoundTemplate] = useState(false);
 
   useEffect(() => {
     const fetchTemplate = async () => {
@@ -33,18 +57,16 @@ export default function TemplateDetailsPage({
         const resolvedParams = await params;
         const response = await templatesAPI.getById(resolvedParams.id);
         if (response.template) {
-          const transformedTemplate = transformBackendTemplate(
-            response.template
-          );
-          setTemplate(transformedTemplate);
+          setTemplate(transformBackendTemplate(response.template));
+          setNotFoundTemplate(false);
         } else {
           toast.error('Template not found');
-          setTemplate(null);
+          setNotFoundTemplate(true);
         }
       } catch (err) {
         console.error('Error fetching template:', err);
         toast.error('Failed to load template');
-        setTemplate(null);
+        setNotFoundTemplate(true);
       } finally {
         setLoading(false);
       }
@@ -55,55 +77,68 @@ export default function TemplateDetailsPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen py-8 bg-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto dark:border-white"></div>
-            <p className="text-muted-foreground mt-4">Loading template...</p>
-          </div>
+      <div className="py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+          <LoadingSpinner text="Loading template..." />
+          <Skeleton className="h-[60vh] w-full rounded-xl" />
         </div>
       </div>
     );
   }
 
-  if (!template) {
-    notFound();
+  if (notFoundTemplate || !template) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center px-4 py-16">
+        <div className="max-w-md text-center space-y-4">
+          <h1 className="text-2xl font-bold">Template not found</h1>
+          <p className="text-muted-foreground">
+            This template may have been removed or the link is incorrect.
+          </p>
+          <Button asChild>
+            <Link href="/templates">Back to templates</Link>
+          </Button>
+        </div>
+      </div>
+    );
   }
 
+  const bestFor =
+    BEST_FOR[template.category] ||
+    [`${template.category} roles`, 'Professional applications'];
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <Button
-            variant="ghost"
-            asChild
-            className="flex items-center space-x-2"
-          >
+    <div className="bg-background pb-24 lg:pb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <Button variant="ghost" asChild className="shrink-0">
             <Link href="/templates">
               <ArrowLeft className="h-4 w-4 text-foreground" />
-              <span>Back to Templates</span>
+              <span>Back</span>
+            </Link>
+          </Button>
+          <Button className="hidden lg:inline-flex" asChild>
+            <Link href={`/resume/form?template=${template.id}`}>
+              Use this template
             </Link>
           </Button>
         </div>
 
-        <div className="grid lg:grid-cols-[1.35fr_1fr] gap-12">
-          {/* Template Preview — full scaled page, scrollable */}
-          <div className="space-y-6">
+        <div className="grid lg:grid-cols-[1.35fr_1fr] gap-8 lg:gap-12">
+          <div className="space-y-4 min-w-0 overflow-x-hidden">
             <Card className="overflow-hidden">
               <CardContent className="p-0">
                 <div className="relative">
-                  <div className="max-h-[min(85vh,64rem)] overflow-y-auto overflow-x-hidden bg-muted/30 p-4 sm:p-6">
+                  <div className="max-h-[min(52vh,28rem)] lg:max-h-[min(85vh,64rem)] overflow-y-auto overflow-x-hidden bg-muted/30 p-3 sm:p-6">
                     <TemplateThumbnail
                       template={template}
                       clip={false}
-                      className="shadow-sm mx-auto max-w-[794px]"
+                      className="shadow-sm mx-auto max-w-full"
                     />
                   </div>
                   {template.isPro && (
                     <Badge
                       variant="secondary"
-                      className="absolute top-4 right-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0 z-10 pointer-events-none"
+                      className="absolute top-4 right-4 bg-primary text-primary-foreground border-0 z-10 pointer-events-none"
                     >
                       <Crown className="w-3 h-3 mr-1" />
                       PRO
@@ -114,125 +149,81 @@ export default function TemplateDetailsPage({
             </Card>
           </div>
 
-          {/* Template Details */}
-          <div className="space-y-6">
+          <div className="space-y-6 lg:sticky lg:top-24 lg:h-fit">
             <div>
-              <div className="flex items-center gap-3 mb-4">
-                <h1 className="text-3xl font-bold">{template.title}</h1>
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <h1 className="text-2xl sm:text-3xl font-bold break-words">
+                  {template.title}
+                </h1>
                 <Badge variant="outline">{template.category}</Badge>
               </div>
-              <p className="text-lg text-muted-foreground mb-6">
+              <p className="text-muted-foreground mb-2">
                 {template.description}
               </p>
             </div>
 
-            {/* Features */}
             <Card>
               <CardContent className="p-6">
-                <h3 className="font-semibold mb-4">Template Features</h3>
+                <h2 className="font-semibold mb-4">Template Features</h2>
                 <ul className="space-y-3 text-sm">
                   <li className="flex items-start gap-2">
                     <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
                     <span>
-                      ATS-friendly formatting ensures your resume passes through
-                      applicant tracking systems
+                      ATS-friendly formatting for applicant tracking systems
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
                     <span>
-                      Professional layout optimized for{' '}
-                      {template.category.toLowerCase()} roles
+                      Layout suited to {template.category.toLowerCase()} roles
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
                     <span>
-                      Clean, modern design that highlights your key
-                      qualifications
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
-                    <span>
-                      Optimized spacing and typography for excellent readability
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
-                    <span>
-                      Industry-standard format preferred by hiring managers
+                      Live HTML preview matches the PDF export path
                     </span>
                   </li>
                 </ul>
               </CardContent>
             </Card>
 
-            {/* Best For */}
             <Card>
               <CardContent className="p-6">
-                <h3 className="font-semibold mb-4">Best For</h3>
+                <h2 className="font-semibold mb-4">Best For</h2>
                 <div className="flex flex-wrap gap-2">
-                  {template.category === 'Professional' && (
-                    <>
-                      <Badge variant="secondary">Corporate Roles</Badge>
-                      <Badge variant="secondary">Management Positions</Badge>
-                      <Badge variant="secondary">Finance & Consulting</Badge>
-                      <Badge variant="secondary">Business Development</Badge>
-                    </>
-                  )}
-                  {template.category === 'Creative' && (
-                    <>
-                      <Badge variant="secondary">Design Roles</Badge>
-                      <Badge variant="secondary">Marketing</Badge>
-                      <Badge variant="secondary">Creative Director</Badge>
-                      <Badge variant="secondary">Agency Work</Badge>
-                    </>
-                  )}
-                  {template.category === 'Tech' && (
-                    <>
-                      <Badge variant="secondary">Software Engineering</Badge>
-                      <Badge variant="secondary">Data Science</Badge>
-                      <Badge variant="secondary">Product Management</Badge>
-                      <Badge variant="secondary">DevOps</Badge>
-                    </>
-                  )}
-                  {template.category === 'Academic' && (
-                    <>
-                      <Badge variant="secondary">Research Positions</Badge>
-                      <Badge variant="secondary">University Roles</Badge>
-                      <Badge variant="secondary">Scientific Roles</Badge>
-                      <Badge variant="secondary">PhD Applications</Badge>
-                    </>
-                  )}
-                  {template.category === 'Minimal' && (
-                    <>
-                      <Badge variant="secondary">Any Industry</Badge>
-                      <Badge variant="secondary">Clean Aesthetic</Badge>
-                      <Badge variant="secondary">Entry Level</Badge>
-                      <Badge variant="secondary">Career Changers</Badge>
-                    </>
-                  )}
+                  {bestFor.map((item) => (
+                    <Badge key={item} variant="secondary">
+                      {item}
+                    </Badge>
+                  ))}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Action Buttons */}
-            <div className="space-y-4">
+            <div className="hidden lg:block space-y-2">
               <Button size="lg" className="w-full" asChild>
                 <Link href={`/resume/form?template=${template.id}`}>
                   Use This Template
                 </Link>
               </Button>
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">
-                  {template.isPro
-                    ? 'Premium template with advanced features'
-                    : 'Free template'}
-                </p>
-              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                {template.isPro
+                  ? 'Premium template with advanced features'
+                  : 'Free template'}
+              </p>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur pb-safe">
+        <div className="px-4 py-3">
+          <Button size="lg" className="w-full" asChild>
+            <Link href={`/resume/form?template=${template.id}`}>
+              Use this template
+            </Link>
+          </Button>
         </div>
       </div>
     </div>

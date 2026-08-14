@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -29,8 +29,14 @@ export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const { login, register, loading } = useAuthContext();
+  const { login, register, loading, user } = useAuthContext();
   const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace('/dashboard');
+    }
+  }, [loading, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,22 +55,26 @@ export default function LoginPage() {
       } else {
         setError(result.error || 'Authentication failed');
       }
-    } catch (err) {
+    } catch {
       setError('Something went wrong. Please try again.');
     }
   };
 
+  if (user) {
+    return null;
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-background">
+    <div className="min-h-[calc(100svh-8rem)] flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8 bg-background">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-3xl font-bold text-foreground">
             Welcome to SkillPaper
-          </h2>
+          </h1>
           <p className="mt-2 text-muted-foreground">
             {isRegister
               ? 'Create your account and start building professional resumes'
-              : 'Sign in to access your dashboard and create amazing resumes'}
+              : 'Sign in to access your dashboard and resumes'}
           </p>
         </div>
 
@@ -81,9 +91,11 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {error && (
-              <Alert variant="destructive">
+              <Alert variant="destructive" className="border-destructive/50">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription className="text-destructive">
+                  {error}
+                </AlertDescription>
               </Alert>
             )}
 
@@ -102,7 +114,8 @@ export default function LoginPage() {
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Enter your full name"
                       className="pl-10"
-                      required
+                      required={isRegister}
+                      autoComplete="name"
                     />
                   </div>
                 </div>
@@ -122,6 +135,7 @@ export default function LoginPage() {
                     placeholder="Enter your email"
                     className="pl-10"
                     required
+                    autoComplete="email"
                   />
                 </div>
               </div>
@@ -138,16 +152,18 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="pl-10 pr-10"
+                    className="pl-10 pr-12"
                     required
                     minLength={6}
+                    autoComplete={isRegister ? 'new-password' : 'current-password'}
                   />
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    size="icon"
+                    className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -170,10 +186,10 @@ export default function LoginPage() {
                 size="lg"
               >
                 {loading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
                     {isRegister ? 'Creating account...' : 'Signing in...'}
-                  </div>
+                  </span>
                 ) : isRegister ? (
                   'Create Account'
                 ) : (
@@ -184,12 +200,10 @@ export default function LoginPage() {
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
+                <span className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or
-                </span>
+                <span className="bg-card px-2 text-muted-foreground">Or</span>
               </div>
             </div>
 
@@ -201,7 +215,7 @@ export default function LoginPage() {
               </p>
               <Button
                 variant="link"
-                className="p-0 h-auto font-medium"
+                className="p-0 h-auto font-medium min-h-11"
                 onClick={() => {
                   setIsRegister(!isRegister);
                   setError('');

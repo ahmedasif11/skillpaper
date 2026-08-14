@@ -44,7 +44,7 @@ export function AchievementsForm({
       </div>
 
       {achievements.map((achievement, index) => (
-        <div key={index} className="flex items-start space-x-2">
+        <div key={index} className="flex flex-col sm:flex-row items-stretch sm:items-start gap-2">
           <Textarea
             value={achievement}
             onChange={(e) => updateAchievement(index, e.target.value)}
@@ -54,16 +54,17 @@ export function AchievementsForm({
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={() => removeAchievement(index)}
-            className="mt-1"
+            className="shrink-0"
+            aria-label="Remove achievement"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       ))}
 
-      <div className="flex space-x-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <Textarea
           value={newAchievement}
           onChange={(e) => setNewAchievement(e.target.value)}
@@ -75,9 +76,10 @@ export function AchievementsForm({
           variant="outline"
           onClick={addAchievement}
           disabled={!newAchievement.trim()}
-          className="mt-1"
+          className="shrink-0"
         >
           <Plus className="h-4 w-4" />
+          Add
         </Button>
       </div>
     </div>

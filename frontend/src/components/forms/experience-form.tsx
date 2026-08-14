@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -33,6 +33,17 @@ export function ExperienceForm({ data, onChange }: ExperienceFormProps) {
           },
         ]
   );
+
+  useEffect(() => {
+    if (data.length > 0) {
+      setExperienceList(
+        data.map((exp, index) => ({
+          ...exp,
+          id: (exp as any).id || `exp-${index}`,
+        })) as Experience[]
+      );
+    }
+  }, [data]);
 
   const handleAddExperience = () => {
     const newExperience: Experience = {
