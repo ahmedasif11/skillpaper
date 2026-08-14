@@ -73,7 +73,8 @@ describe('Uploaded resume library (Phase 1)', () => {
     expect(ownerList.status).toBe(200);
     expect(ownerList.body.total).toBe(1);
     expect(ownerList.body.data[0].id).toBe(id);
-    expect(ownerList.body.data[0].status).toBe('parsing');
+    expect(ownerList.body.data[0].status).toBe('ready');
+    expect(ownerList.body.data[0].confidenceScore).toBeGreaterThan(0);
 
     const otherList = await request(app)
       .get('/api/uploaded-resumes')
@@ -216,5 +217,117 @@ describe('Uploaded resume library (Phase 1)', () => {
     const res = await uploadPdf(ownerRes.body.token);
     expect(res.status).toBe(429);
     expect(res.body.code).toBe('QUOTA_EXCEEDED');
+  });
+});
+
+describe('Uploaded resume parse APIs (Phase 2)', () => {
+  it('GET :id metadata, status, and parsed data for owner; 403 for others', async () => {
+    const { res: ownerRes } = await registerUser(app);
+    const token = ownerRes.body.token;
+    const created = await uploadPdf(token, { label: 'Software Engineer Resume' });
+    const id = created.body.data.id;
+
+    const meta = await request(app)
+      .get(`/api/uploaded-resumes/${id}`)
+      .set(authHeader(token));
+    expect(meta.status).toBe(200);
+    expect(meta.body.data).toMatchObject({
+      id,
+      label: 'Software Engineer Resume',
+      status: 'ready',
+      mimeType: 'application/pdf',
+    });
+    expect(meta.body.data.parsedData).toBeUndefined();
+    expect(meta.body.data.confidenceScore).toEqual(expect.any(Number));
+
+    const status = await request(app)
+      .get(`/api/uploaded-resumes/${id}/status`)
+      .set(authHeader(token));
+    expect(status.status).toBe(200);
+    expect(status.body.data.status).toBe('ready');
+    expect(status.body.data.progressHint).toBeDefined();
+
+    const data = await request(app)
+      .get(`/api/uploaded-resumes/${id}/data`)
+      .set(authHeader(token));
+    expect(data.status).toBe(200);
+    expect(data.body.data.parsedData.name).toBe('Jane Doe');
+    expect(data.body.data.parsedData.email).toBe('jane@example.com');
+
+    const { res: otherRes } = await registerUser(app, {
+      name: 'Bob Intruder',
+      email: 'bob@example.com',
+      password: 'other-password',
+    });
+    const denied = await request(app)
+      .get(`/api/uploaded-resumes/${id}`)
+      .set(authHeader(otherRes.body.token));
+    expect(denied.status).toBe(403);
+  });
+
+  it('GET :id/data when scan failed → 409 PARSE_NOT_READY', async () => {
+    const { res: ownerRes } = await registerUser(app);
+    const created = await uploadPdf(ownerRes.body.token, {
+      body: EICAR_PDF,
+      filename: 'eicar.pdf',
+    });
+    const res = await request(app)
+      .get(`/api/uploaded-resumes/${created.body.data.id}/data`)
+      .set(authHeader(ownerRes.body.token));
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('PARSE_NOT_READY');
+  });
+
+  it('POST :id/reparse enqueues and returns 202; blocked while scanning', async () => {
+    const { res: ownerRes } = await registerUser(app);
+    const token = ownerRes.body.token;
+    const created = await uploadPdf(token);
+    const id = created.body.data.id;
+
+    const reparsing = await request(app)
+      .post(`/api/uploaded-resumes/${id}/reparse`)
+      .set(authHeader(token));
+    expect(reparsing.status).toBe(202);
+    expect(reparsing.body.data.message).toMatch(/re-parse/i);
+
+    const after = await request(app)
+      .get(`/api/uploaded-resumes/${id}/status`)
+      .set(authHeader(token));
+    expect(after.body.data.status).toBe('ready');
+
+    await UploadedResume.findByIdAndUpdate(id, { status: 'scanning' });
+    const blocked = await request(app)
+      .post(`/api/uploaded-resumes/${id}/reparse`)
+      .set(authHeader(token));
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.code).toBe('REPARSE_IN_PROGRESS');
+  });
+
+  it('PUT :id/file same hash → unchanged; different hash → re-parse', async () => {
+    const { res: ownerRes } = await registerUser(app);
+    const token = ownerRes.body.token;
+    const created = await uploadPdf(token);
+    const id = created.body.data.id;
+
+    const same = await request(app)
+      .put(`/api/uploaded-resumes/${id}/file`)
+      .set(authHeader(token))
+      .attach('file', MIN_PDF, 'cv.pdf');
+    expect(same.status).toBe(200);
+    expect(same.body.data.changed).toBe(false);
+
+    const otherPdf = Buffer.concat([MIN_PDF, Buffer.from('\n% extra\n')]);
+    const changed = await request(app)
+      .put(`/api/uploaded-resumes/${id}/file`)
+      .set(authHeader(token))
+      .attach('file', otherPdf, 'cv2.pdf');
+    expect(changed.status).toBe(200);
+    expect(changed.body.data.changed).toBe(true);
+
+    const data = await request(app)
+      .get(`/api/uploaded-resumes/${id}/data`)
+      .set(authHeader(token));
+    expect(data.status).toBe(200);
+    expect(data.body.data.parsedData.name).toBe('Jane Doe');
   });
 });

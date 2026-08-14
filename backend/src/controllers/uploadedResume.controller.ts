@@ -233,6 +233,307 @@ export const listUploadedResumes = async (req: Request, res: Response) => {
   }
 };
 
+const ACTIVE_PARSE_STATUSES: ParseStatus[] = [
+  'uploaded',
+  'scanning',
+  'parsing',
+];
+
+function progressForStatus(status: ParseStatus): {
+  progressHint: string;
+  estimatedSecondsRemaining: number;
+} {
+  switch (status) {
+    case 'uploaded':
+      return {
+        progressHint: 'Queued for processing...',
+        estimatedSecondsRemaining: 25,
+      };
+    case 'scanning':
+      return {
+        progressHint: 'Scanning your file for safety...',
+        estimatedSecondsRemaining: 18,
+      };
+    case 'parsing':
+      return {
+        progressHint: 'AI is reading your resume...',
+        estimatedSecondsRemaining: 12,
+      };
+    case 'ready':
+      return { progressHint: 'Ready', estimatedSecondsRemaining: 0 };
+    case 'failed:scan':
+      return {
+        progressHint: 'File failed the security scan',
+        estimatedSecondsRemaining: 0,
+      };
+    case 'failed:parse':
+      return {
+        progressHint: 'Parsing failed',
+        estimatedSecondsRemaining: 0,
+      };
+  }
+}
+
+function metadataPayload(doc: {
+  _id: unknown;
+  label: string;
+  filename: string;
+  fileSize: number;
+  mimeType: string;
+  status: ParseStatus;
+  parseError: string | null;
+  confidenceScore: number | null;
+  isOcrExtracted: boolean;
+  parsedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: String(doc._id),
+    label: doc.label,
+    filename: doc.filename,
+    fileSize: doc.fileSize,
+    mimeType: doc.mimeType,
+    status: doc.status,
+    parseError: doc.parseError,
+    confidenceScore: doc.confidenceScore,
+    isOcrExtracted: doc.isOcrExtracted,
+    parsedAt: doc.parsedAt,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  };
+}
+
+/**
+ * GET /api/uploaded-resumes/:id
+ */
+export const getUploadedResume = async (req: Request, res: Response) => {
+  try {
+    const doc = await loadOwnedUploadedResume(req, res);
+    if (!doc) return;
+    return res.json({ success: true, data: metadataPayload(doc) });
+  } catch (err) {
+    console.error('Get uploaded resume error:', err);
+    return fail(res, 500, 'Server error');
+  }
+};
+
+/**
+ * GET /api/uploaded-resumes/:id/status
+ */
+export const getUploadedResumeStatus = async (req: Request, res: Response) => {
+  try {
+    const doc = await loadOwnedUploadedResume(req, res);
+    if (!doc) return;
+    const progress = progressForStatus(doc.status);
+    return res.json({
+      success: true,
+      data: {
+        id: String(doc._id),
+        status: doc.status,
+        ...progress,
+      },
+    });
+  } catch (err) {
+    console.error('Get uploaded resume status error:', err);
+    return fail(res, 500, 'Server error');
+  }
+};
+
+/**
+ * GET /api/uploaded-resumes/:id/data
+ */
+export const getUploadedResumeData = async (req: Request, res: Response) => {
+  try {
+    const doc = await loadOwnedUploadedResume(req, res);
+    if (!doc) return;
+    if (doc.status !== 'ready' || !doc.parsedData) {
+      return fail(
+        res,
+        409,
+        'Parsed data is not ready yet',
+        'PARSE_NOT_READY'
+      );
+    }
+    return res.json({
+      success: true,
+      data: {
+        parsedData: doc.parsedData,
+        confidenceScore: doc.confidenceScore,
+        isOcrExtracted: doc.isOcrExtracted,
+        parsedAt: doc.parsedAt,
+      },
+    });
+  } catch (err) {
+    console.error('Get uploaded resume data error:', err);
+    return fail(res, 500, 'Server error');
+  }
+};
+
+/**
+ * POST /api/uploaded-resumes/:id/reparse
+ */
+export const reparseUploadedResume = async (req: Request, res: Response) => {
+  try {
+    const doc = await loadOwnedUploadedResume(req, res);
+    if (!doc) return;
+
+    if (ACTIVE_PARSE_STATUSES.includes(doc.status)) {
+      return fail(
+        res,
+        409,
+        'A parse job is already in progress',
+        'REPARSE_IN_PROGRESS'
+      );
+    }
+
+    if (doc.status !== 'ready' && doc.status !== 'failed:parse') {
+      return fail(
+        res,
+        409,
+        'Re-parse is only allowed when status is ready or failed:parse',
+        'REPARSE_IN_PROGRESS'
+      );
+    }
+
+    doc.status = 'uploaded';
+    doc.parseError = null;
+    doc.parsedData = null;
+    doc.confidenceScore = null;
+    doc.parsedAt = null;
+    await doc.save();
+
+    await getQueue().enqueueParse({
+      uploadedResumeId: String(doc._id),
+      userId: String(doc.user),
+      objectKey: doc.minioKey,
+    });
+
+    return res.status(202).json({
+      success: true,
+      data: {
+        message: 'Re-parse job enqueued.',
+        status: 'uploaded',
+      },
+    });
+  } catch (err) {
+    console.error('Reparse uploaded resume error:', err);
+    return fail(res, 500, 'Server error');
+  }
+};
+
+/**
+ * PUT /api/uploaded-resumes/:id/file
+ */
+export const replaceUploadedResumeFile = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const doc = await loadOwnedUploadedResume(req, res);
+    if (!doc) return;
+    const user = req.user;
+    if (!user) return fail(res, 401, 'Unauthorized');
+
+    const file = req.file;
+    if (!file) {
+      return fail(res, 400, 'Missing file');
+    }
+
+    const mimeType = file.mimetype as ResumeMime;
+    if (!ALLOWED_RESUME_MIMES.has(mimeType)) {
+      return fail(
+        res,
+        415,
+        'Unsupported file type. Only PDF and DOCX are allowed.',
+        'UNSUPPORTED_FORMAT'
+      );
+    }
+
+    if (!validateMagicBytes(file.buffer, mimeType)) {
+      return fail(
+        res,
+        422,
+        'File content does not match the declared type',
+        'UNSUPPORTED_FORMAT'
+      );
+    }
+
+    const newHash = createHash('sha256').update(file.buffer).digest('hex');
+    if (doc.fileHash && doc.fileHash === newHash) {
+      return res.json({
+        success: true,
+        data: {
+          changed: false,
+          message:
+            'File is identical to the current version. No re-processing needed.',
+          status: doc.status,
+        },
+      });
+    }
+
+    const filename = displayFilename(file.originalname);
+    const storedName = safeStoredFilename(mimeType, String(doc._id));
+    const objectKey = storageKey(
+      String(user._id),
+      String(doc._id),
+      storedName
+    );
+    const storage = getStorage();
+    const previousKey = doc.minioKey;
+
+    try {
+      await storage.put({
+        key: objectKey,
+        body: file.buffer,
+        contentType: mimeType,
+      });
+    } catch (err) {
+      console.error('Storage put failed', err);
+      return fail(res, 500, 'Failed to store uploaded file', 'STORAGE_ERROR');
+    }
+
+    if (previousKey && previousKey !== objectKey) {
+      try {
+        await storage.delete(previousKey);
+      } catch (err) {
+        console.error('Failed to delete previous object', previousKey, err);
+      }
+    }
+
+    doc.filename = filename;
+    doc.fileSize = file.size;
+    doc.mimeType = mimeType;
+    doc.minioKey = objectKey;
+    doc.fileHash = newHash;
+    doc.status = 'uploaded';
+    doc.parseError = null;
+    doc.parsedData = null;
+    doc.confidenceScore = null;
+    doc.parsedAt = null;
+    doc.isOcrExtracted = false;
+    await doc.save();
+
+    await getQueue().enqueueParse({
+      uploadedResumeId: String(doc._id),
+      userId: String(user._id),
+      objectKey,
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        changed: true,
+        message: 'New version detected. Re-parsing in progress.',
+        status: 'uploaded',
+      },
+    });
+  } catch (err) {
+    console.error('Replace uploaded resume file error:', err);
+    return fail(res, 500, 'Server error');
+  }
+};
+
 /**
  * DELETE /api/uploaded-resumes/:id
  */

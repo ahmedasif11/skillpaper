@@ -36,7 +36,7 @@ export function getLlm(): ILlmService {
         break;
       case 'gemini':
         llm = new GeminiLlmAdapter({
-          apiKey: process.env.GEMINI_API_KEY,
+          apiKey: requireEnv('GEMINI_API_KEY'),
           model: process.env.GEMINI_MODEL ?? 'gemini-2.0-flash',
         });
         break;
@@ -137,6 +137,9 @@ export function getQueue(): IQueueService {
 }
 
 export function startParseWorker(): void {
+  if ((process.env.LLM_PROVIDER ?? 'gemini') === 'gemini') {
+    requireEnv('GEMINI_API_KEY');
+  }
   if ((process.env.QUEUE_PROVIDER ?? 'bullmq') !== 'bullmq') {
     return;
   }
