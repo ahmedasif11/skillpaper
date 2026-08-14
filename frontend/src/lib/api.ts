@@ -18,6 +18,7 @@ export interface ApiError {
   message: string;
   status?: number;
   details?: any;
+  code?: string;
 }
 
 // Request interceptor to add auth token
@@ -26,6 +27,13 @@ api.interceptors.request.use(
     const token = localStorage.getItem('resumeBuilder_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      if (typeof config.headers?.delete === 'function') {
+        config.headers.delete('Content-Type');
+      } else {
+        delete config.headers['Content-Type'];
+      }
     }
     return config;
   },
@@ -51,6 +59,7 @@ api.interceptors.response.use(
       const data = error.response.data as any;
       apiError.message =
         data.message || `Server Error: ${error.response.status}`;
+      apiError.code = data.code;
 
       const requestUrl = `${error.config?.baseURL || ''}${error.config?.url || ''}`;
       const isAuthAttempt = /\/auth\/(login|register)(?:\?|$)/.test(
@@ -154,6 +163,87 @@ export const templatesAPI = {
     html: string;
   }) => {
     const response = await api.post('/templates', templateData);
+    return response.data;
+  },
+};
+
+export const uploadedResumesAPI = {
+  upload: async (
+    file: File,
+    label?: string,
+    onUploadProgress?: (percent: number) => void
+  ) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (label?.trim()) {
+      formData.append('label', label.trim());
+    }
+    const response = await api.post('/uploaded-resumes', formData, {
+      timeout: 120000,
+      onUploadProgress: (event) => {
+        if (!onUploadProgress || !event.total) return;
+        onUploadProgress(Math.round((event.loaded / event.total) * 100));
+      },
+    });
+    return response.data;
+  },
+
+  list: async (status?: string) => {
+    const response = await api.get('/uploaded-resumes', {
+      params: status ? { status } : undefined,
+    });
+    return response.data;
+  },
+
+  getById: async (id: string) => {
+    const response = await api.get(`/uploaded-resumes/${id}`);
+    return response.data;
+  },
+
+  getStatus: async (id: string) => {
+    const response = await api.get(`/uploaded-resumes/${id}/status`);
+    return response.data;
+  },
+
+  getData: async (id: string) => {
+    const response = await api.get(`/uploaded-resumes/${id}/data`);
+    return response.data;
+  },
+
+  download: async (id: string) => {
+    const response = await api.get(`/uploaded-resumes/${id}/download`);
+    return response.data;
+  },
+
+  updateLabel: async (id: string, label: string) => {
+    const response = await api.put(`/uploaded-resumes/${id}`, { label });
+    return response.data;
+  },
+
+  replaceFile: async (
+    id: string,
+    file: File,
+    onUploadProgress?: (percent: number) => void
+  ) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.put(`/uploaded-resumes/${id}/file`, formData, {
+      timeout: 120000,
+      onUploadProgress: (event) => {
+        if (!onUploadProgress || !event.total) return;
+        onUploadProgress(Math.round((event.loaded / event.total) * 100));
+      },
+    });
+    return response.data;
+  },
+
+  reparse: async (id: string) => {
+    const response = await api.post(`/uploaded-resumes/${id}/reparse`);
+    return response.data;
+  },
+
+  delete: async (id: string) => {
+    const response = await api.delete(`/uploaded-resumes/${id}`);
     return response.data;
   },
 };

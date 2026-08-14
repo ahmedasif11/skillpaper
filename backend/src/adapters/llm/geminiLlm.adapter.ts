@@ -4,7 +4,7 @@ import type { LlmParseInput, LlmParseOutput } from '../../interfaces/types';
 import { buildResumeParsePrompt } from '../../services/gemini.prompts';
 import { RESUME_JSON_SCHEMA } from '../../services/gemini.schema';
 
-const PRO_MODEL = 'gemini-1.5-pro';
+const PRO_MODEL = 'gemini-3.5-flash';
 const MAX_ATTEMPTS = 3;
 
 function sleep(ms: number): Promise<void> {
@@ -47,7 +47,7 @@ export class GeminiLlmAdapter implements ILlmService {
 
   constructor(config: { apiKey: string; model?: string }) {
     this.genAI = new GoogleGenerativeAI(config.apiKey);
-    this.defaultModel = config.model ?? 'gemini-2.0-flash';
+    this.defaultModel = config.model ?? 'gemini-3.5-flash';
   }
 
   async parseResume(input: LlmParseInput): Promise<LlmParseOutput> {

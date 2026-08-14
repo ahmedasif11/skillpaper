@@ -82,7 +82,7 @@ User visits /templates
 
 | Technology | Purpose |
 |---|---|
-| **Google Gemini API** (gemini-1.5-pro / gemini-2.0-flash) | Resume data extraction and structured output |
+| **Google Gemini API** (`gemini-3.5-flash`) | Resume data extraction and structured output |
 | **MinIO** (S3-compatible) | Persistent file storage for uploaded resumes |
 | **ClamAV** | Antivirus/malware scanning of uploaded files |
 | **OpenCV** (Python microservice) | Image-layer malware detection, steganography checks in image-embedded PDFs |

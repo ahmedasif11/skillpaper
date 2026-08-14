@@ -21,6 +21,7 @@ import { useErrorHandler } from '../../hooks/useErrorHandler';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { toast } from 'sonner';
 import { Skeleton } from '../../components/ui/skeleton';
+import { UploadedResumesSection } from './_components/UploadedResumesSection';
 
 export default function DashboardPage() {
   const [resumes, setResumes] = useState<Resume[]>([]);
@@ -204,6 +205,8 @@ export default function DashboardPage() {
                 </Card>
               )}
             </div>
+
+            <UploadedResumesSection />
           </div>
         </div>
       </ErrorBoundary>

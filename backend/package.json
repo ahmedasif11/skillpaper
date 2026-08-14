@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
-    "dev": "ts-node-dev --respawn src/server.ts",
+    "dev": "ts-node-dev --files --respawn src/server.ts",
     "db:up": "docker compose --project-directory .. up -d mongo",
     "db:down": "docker compose --project-directory .. stop mongo",
     "infra:up": "docker compose --project-directory .. up -d --build",

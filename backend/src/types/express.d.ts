@@ -1,10 +1,11 @@
-// src/types/express.d.ts
-import { Request } from 'express';
-import { IUser } from '../models/User';
+import type { Request } from 'express';
+import type { IUser } from '../models/User';
 
-declare module 'express-serve-static-core' {
-  interface Request {
-    user?: IUser | null;
+declare global {
+  namespace Express {
+    interface Request {
+      user?: IUser | null;
+    }
   }
 }
 

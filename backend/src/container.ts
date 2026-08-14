@@ -37,7 +37,7 @@ export function getLlm(): ILlmService {
       case 'gemini':
         llm = new GeminiLlmAdapter({
           apiKey: requireEnv('GEMINI_API_KEY'),
-          model: process.env.GEMINI_MODEL ?? 'gemini-2.0-flash',
+          model: process.env.GEMINI_MODEL ?? 'gemini-3.5-flash',
         });
         break;
       default:

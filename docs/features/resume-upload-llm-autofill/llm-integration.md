@@ -12,8 +12,8 @@ Google Gemini is the core intelligence layer of this feature. Its job is to read
 **Why Gemini?**
 - Native structured output mode (returns valid JSON, no post-processing needed)
 - Free tier supports prototyping at scale
-- `gemini-2.0-flash` has low latency (~3–8s for resume-length text)
-- `gemini-1.5-pro` available as a fallback for complex/verbose resumes
+- `gemini-3.5-flash` has low latency for resume-length text
+- Same Flash model is retried as a fallback for empty/invalid JSON (Gemini 2.0 / 1.5 models were shut down)
 - Easy migration path: swap to OpenAI or Claude by changing the service adapter
 
 ---
@@ -22,17 +22,12 @@ Google Gemini is the core intelligence layer of this feature. Its job is to read
 
 | Model | Use Case | Latency | Cost |
 |---|---|---|---|
-| `gemini-2.0-flash` | Default for all parses | ~3–8s | Very low |
-| `gemini-1.5-pro` | Fallback if Flash produces low-confidence output | ~10–20s | Medium |
-| `gemini-1.5-flash-8b` | If rate limits hit on Flash | ~2–5s | Lowest |
+| `gemini-3.5-flash` | Default for all parses | ~3–8s | Low |
+| `gemini-3.5-flash` | Retry if Flash produces empty/invalid JSON | ~3–8s | Low |
 
 **Selection logic:**
 ```ts
-// Default
-const model = 'gemini-2.0-flash';
-
-// If previous parse confidence score < 0.7
-const model = 'gemini-1.5-pro';
+const model = process.env.GEMINI_MODEL ?? 'gemini-3.5-flash';
 ```
 
 ---
@@ -52,7 +47,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function parseResumeWithGemini(rawText: string): Promise<ParsedResumeData> {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3.5-flash',
     generationConfig: {
       responseMimeType: 'application/json',
       responseSchema: RESUME_JSON_SCHEMA,  // defined below
@@ -362,11 +357,11 @@ export function computeConfidenceScore(data: ParsedResumeData): number {
 ## 8. Retry & Fallback Strategy
 
 ```
-Gemini call attempt 1 (gemini-2.0-flash)
+Gemini call attempt 1 (gemini-3.5-flash)
   ├─ Success → validate → store
   ├─ Rate limit (429) → wait 5s → retry (max 3×)
   ├─ Model overload (503) → retry with backoff
-  └─ Empty/invalid response → retry once with gemini-1.5-pro
+  └─ Empty/invalid response → retry once with gemini-3.5-flash
        ├─ Success → validate → store
        └─ Failure → set status: "failed:parse", store rawText only
 ```

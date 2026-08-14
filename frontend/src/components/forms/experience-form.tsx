@@ -35,11 +35,12 @@ export function ExperienceForm({ data, onChange }: ExperienceFormProps) {
   );
 
   useEffect(() => {
-    if (data.length > 0) {
+    if (data && data.length > 0) {
       setExperienceList(
         data.map((exp, index) => ({
           ...exp,
           id: (exp as any).id || `exp-${index}`,
+          position: (exp as any).position || (exp as any).title || '',
         })) as Experience[]
       );
     }

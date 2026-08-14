@@ -106,6 +106,7 @@ export function ResumePreview({
 
       return (
         <iframe
+          key={`${personalInfo.name}-${personalInfo.email}-${experience?.length ?? 0}-${education?.length ?? 0}`}
           srcDoc={previewHtml}
           className="resume-preview-iframe"
           style={{

@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { ArrowLeft, ArrowRight, Save, Eye, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, Eye, X, Import } from 'lucide-react';
 import { ProgressIndicator } from '@/components/common/progress-indicator';
 import { PersonalInfoForm } from '@/components/forms/personal-info-form';
 import { EducationForm } from '@/components/forms/education-form';
@@ -23,6 +23,11 @@ import {
   getTemplateIdFromResume,
   isPersistedResumeId,
 } from '@/lib/hydrateResumeForm';
+import { ImportModal } from '@/components/resume-import/ImportModal';
+import {
+  clearPendingImport,
+  getPendingImport,
+} from '@/lib/pendingImport';
 import { Template, FormStep, PersonalInfo } from '@/types';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -33,7 +38,7 @@ function ResumeFormPage() {
   const router = useRouter();
   const templateIdParam = searchParams.get('template');
   const resumeId = searchParams.get('id');
-  const { isAuthenticated } = useAuthContext();
+  const { isAuthenticated, loading: authLoading } = useAuthContext();
 
   const [currentStep, setCurrentStep] = useState<FormStep>('personal');
   const [showPreview, setShowPreview] = useState(false);
@@ -45,6 +50,14 @@ function ResumeFormPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [resumeData, setResumeData] = useState<any>(createEmptyResumeFormData());
+  const [importOpen, setImportOpen] = useState(false);
+  const [importedFrom, setImportedFrom] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+  const [pendingImportId, setPendingImportId] = useState<string | null>(null);
+  const [formEpoch, setFormEpoch] = useState(0);
+  const importAppliedRef = React.useRef(false);
 
   const steps: { key: FormStep; label: string }[] = [
     { key: 'personal', label: 'Personal Info' },
@@ -58,6 +71,9 @@ function ResumeFormPage() {
   const currentStepIndex = steps.findIndex((step) => step.key === currentStep);
 
   useEffect(() => {
+    if (authLoading) return;
+    let cancelled = false;
+
     const load = async () => {
       try {
         setLoading(true);
@@ -69,7 +85,7 @@ function ResumeFormPage() {
           try {
             const response = await resumesAPI.getById(resumeId!);
             const resume = response.resume || response;
-            if (resume?.data) {
+            if (resume?.data && !cancelled && !importAppliedRef.current) {
               setResumeData(hydrateFormFromStoredData(resume.data));
               hydratedFromResume = true;
             }
@@ -83,6 +99,7 @@ function ResumeFormPage() {
 
         if (nextTemplateId) {
           const response = await templatesAPI.getById(nextTemplateId);
+          if (cancelled) return;
           if (response.template) {
             setTemplate(transformBackendTemplate(response.template));
             setResolvedTemplateId(nextTemplateId);
@@ -95,10 +112,18 @@ function ResumeFormPage() {
           );
         }
 
-        if (!hydratedFromResume && isAuthenticated) {
+        if (
+          !hydratedFromResume &&
+          isAuthenticated &&
+          !importAppliedRef.current
+        ) {
           try {
             const profileResponse = await authAPI.getProfile();
-            if (profileResponse.user?.profileData) {
+            if (
+              profileResponse.user?.profileData &&
+              !cancelled &&
+              !importAppliedRef.current
+            ) {
               setResumeData(
                 hydrateFormFromStoredData(profileResponse.user.profileData)
               );
@@ -109,14 +134,25 @@ function ResumeFormPage() {
         }
       } catch (err) {
         console.error('Error fetching template:', err);
-        setLoadError('Failed to load the builder. Please try again.');
+        if (!cancelled) {
+          setLoadError('Failed to load the builder. Please try again.');
+        }
       } finally {
+        if (cancelled) return;
         setLoading(false);
+        const pending = getPendingImport();
+        if (pending && isAuthenticated && !importAppliedRef.current) {
+          setPendingImportId(pending.id);
+          setImportOpen(true);
+        }
       }
     };
 
     load();
-  }, [templateIdParam, resumeId, isAuthenticated]);
+    return () => {
+      cancelled = true;
+    };
+  }, [templateIdParam, resumeId, isAuthenticated, authLoading]);
 
   useEffect(() => {
     if (mobilePreviewOpen) {
@@ -202,6 +238,48 @@ function ResumeFormPage() {
       ...prev,
       [field]: value,
     }));
+  };
+
+  const handleImportApply = (
+    formData: any,
+    meta: { id: string; label: string }
+  ) => {
+    importAppliedRef.current = true;
+    const nextData = {
+      ...formData,
+      templateId: resolvedTemplateId,
+      templateName: template?.title,
+      sourceUploadedResumeId: meta.id,
+    };
+    setResumeData(nextData);
+    setImportedFrom(meta);
+    setShowPreview(true);
+    setFormEpoch((value) => value + 1);
+    setCurrentStep('personal');
+    localStorage.setItem('resumeData', JSON.stringify(nextData));
+    clearPendingImport();
+    setPendingImportId(null);
+  };
+
+  const handleClearImport = () => {
+    importAppliedRef.current = false;
+    setResumeData({
+      ...createEmptyResumeFormData(),
+      templateId: resolvedTemplateId,
+      templateName: template?.title,
+    });
+    setImportedFrom(null);
+    setFormEpoch((value) => value + 1);
+    toast.info('Form data cleared.');
+  };
+
+  const openImportModal = () => {
+    if (!isAuthenticated) {
+      toast.error('Sign in to import from an uploaded resume.');
+      router.push('/login');
+      return;
+    }
+    setImportOpen(true);
   };
 
   const renderCurrentForm = () => {
@@ -333,6 +411,10 @@ function ResumeFormPage() {
                 <Save className="h-4 w-4 mr-2" />
                 Save Draft
               </Button>
+              <Button variant="outline" size="sm" onClick={openImportModal}>
+                <Import className="h-4 w-4 mr-2" />
+                Import from Resume
+              </Button>
             </div>
           </div>
           {template && (
@@ -355,6 +437,18 @@ function ResumeFormPage() {
           />
         </div>
 
+        {importedFrom && (
+          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-900 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p className="text-sm">
+              Form filled from “{importedFrom.label}”. Review and edit any field
+              before saving.
+            </p>
+            <Button variant="outline" size="sm" onClick={handleClearImport}>
+              Clear import
+            </Button>
+          </div>
+        )}
+
         <div
           className={`grid gap-8 ${showPreview ? 'lg:grid-cols-2' : 'lg:grid-cols-1'}`}
         >
@@ -363,7 +457,7 @@ function ResumeFormPage() {
               <CardHeader>
                 <CardTitle>{steps[currentStepIndex].label}</CardTitle>
               </CardHeader>
-              <CardContent>{renderCurrentForm()}</CardContent>
+              <CardContent key={formEpoch}>{renderCurrentForm()}</CardContent>
             </Card>
 
             <div className="hidden sm:flex justify-between gap-3">
@@ -446,6 +540,13 @@ function ResumeFormPage() {
           </div>
         </div>
       )}
+
+      <ImportModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onApply={handleImportApply}
+        initialResumeId={pendingImportId}
+      />
     </div>
   );
 }

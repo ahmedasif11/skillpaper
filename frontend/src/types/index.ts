@@ -233,3 +233,120 @@ export interface User {
   avatar?: string;
   createdAt: string;
 }
+
+export type ParseStatus =
+  | 'uploaded'
+  | 'scanning'
+  | 'parsing'
+  | 'ready'
+  | 'failed:scan'
+  | 'failed:parse';
+
+export interface UploadedResumeSummary {
+  skillsCount: number;
+  experienceCount: number;
+  educationCount: number;
+  projectsCount: number;
+}
+
+export interface UploadedResume {
+  id: string;
+  label: string;
+  filename: string;
+  fileSize: number;
+  mimeType: string;
+  status: ParseStatus;
+  parseError: string | null;
+  confidenceScore: number | null;
+  isOcrExtracted: boolean;
+  summary?: UploadedResumeSummary;
+  parsedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ParsedResumeLink {
+  label?: string;
+  url: string;
+}
+
+export interface ParsedResumeEducation {
+  institution: string;
+  degree: string;
+  field?: string;
+  graduationYear?: string;
+  gpa?: string;
+  description?: string;
+}
+
+export interface ParsedResumeExperience {
+  company: string;
+  title: string;
+  startDate?: string;
+  endDate?: string;
+  location?: string;
+  responsibilities?: string[];
+  description?: string;
+}
+
+export interface ParsedResumeProject {
+  name: string;
+  description: string;
+  technologies?: string[];
+  url?: string;
+  date?: string;
+}
+
+export interface ParsedResumeCertification {
+  name: string;
+  issuer?: string;
+  date?: string;
+  url?: string;
+}
+
+export interface ParsedResumeLanguage {
+  name: string;
+  proficiency?: string;
+}
+
+export interface ParsedResumeAchievement {
+  title: string;
+  description?: string;
+  date?: string;
+}
+
+export interface ParsedResumeData {
+  name: string;
+  email?: string;
+  phone?: string;
+  location?: string;
+  summary?: string;
+  links?: ParsedResumeLink[];
+  education?: ParsedResumeEducation[];
+  experience?: ParsedResumeExperience[];
+  skills?: string[];
+  softSkills?: string[];
+  tools?: string[];
+  projects?: ParsedResumeProject[];
+  certifications?: ParsedResumeCertification[];
+  languages?: ParsedResumeLanguage[];
+  achievements?: ParsedResumeAchievement[];
+}
+
+export interface UploadedResumeWithData extends UploadedResume {
+  parsedData: ParsedResumeData | null;
+}
+
+export interface UploadedResumeStatus {
+  id: string;
+  status: ParseStatus;
+  progressHint: string;
+  estimatedSecondsRemaining?: number;
+}
+
+export interface UploadedResumeParsedPayload {
+  parsedData: ParsedResumeData;
+  confidenceScore: number | null;
+  isOcrExtracted: boolean;
+  parsedAt: string | null;
+}

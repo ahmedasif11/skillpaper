@@ -31,7 +31,7 @@ export function EducationForm({ data, onChange }: EducationFormProps) {
   );
 
   useEffect(() => {
-    if (data.length > 0) {
+    if (data && data.length > 0) {
       setEducationList(
         data.map((edu, index) => ({
           ...edu,

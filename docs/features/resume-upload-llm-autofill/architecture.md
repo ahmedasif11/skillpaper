@@ -77,7 +77,7 @@
                    ┌──────────▼──────────┐
                    │   Gemini API        │
                    │   (Google AI)       │
-                   │   gemini-2.0-flash  │
+                   │   gemini-3.5-flash  │
                    └─────────────────────┘
 ```
 
@@ -162,7 +162,7 @@ A lightweight, standalone Python service responsible for:
 
 ### 2.7 Google Gemini API
 
-- Model: `gemini-2.0-flash` (fast, cost-effective) or `gemini-1.5-pro` (higher quality)
+- Model: `gemini-3.5-flash` (Gemini 2.0 Flash and 1.5 Pro were shut down)
 - Called from the Parse Worker (server-side only)
 - API key stored in backend `.env` (`GEMINI_API_KEY`)
 - Structured output mode (`response_mime_type: "application/json"`) used for schema compliance
@@ -331,7 +331,7 @@ REDIS_PORT=6379
 
 # Gemini
 GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-3.5-flash
 
 # ClamAV
 CLAMAV_HOST=localhost

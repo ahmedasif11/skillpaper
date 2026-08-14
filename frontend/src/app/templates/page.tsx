@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import LoadingSpinner from '../../components/common/loading-spinner';
+import { getPendingImport } from '../../lib/pendingImport';
 
 export default function TemplatesPage() {
   const router = useRouter();
@@ -27,6 +28,12 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pendingLabel, setPendingLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    const pending = getPendingImport();
+    setPendingLabel(pending?.label || null);
+  }, []);
 
   const fetchTemplates = useCallback(async () => {
     try {
@@ -77,6 +84,12 @@ export default function TemplatesPage() {
           <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">
             Live previews of every template. Pick one and fill in your details.
           </p>
+          {pendingLabel && (
+            <p className="mt-4 text-sm rounded-lg border border-border bg-muted/50 px-4 py-3 inline-block">
+              After you pick a template, we&apos;ll import “{pendingLabel}” so
+              you can review it before saving.
+            </p>
+          )}
         </div>
 
         <div className="sticky top-16 z-30 -mx-4 px-4 py-3 mb-8 bg-background/95 backdrop-blur border-b border-border sm:mx-0 sm:px-0 sm:border-0 sm:static sm:bg-transparent sm:backdrop-blur-none">

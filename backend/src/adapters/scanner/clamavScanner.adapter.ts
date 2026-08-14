@@ -122,10 +122,16 @@ export class ClamavScannerAdapter implements IScannerService {
 
       return { safe: true, engine: 'opencv', score, findings };
     } catch (err) {
-      console.warn(
-        'OpenCV service unavailable; continuing without image scan',
-        err
-      );
+      const axiosErr = err as {
+        code?: string;
+        message?: string;
+        cause?: { code?: string; message?: string };
+      };
+      console.warn('OpenCV service unavailable; continuing without image scan', {
+        url: `${baseUrl.replace(/\/$/, '')}/scan-images`,
+        code: axiosErr.cause?.code ?? axiosErr.code,
+        message: axiosErr.cause?.message ?? axiosErr.message,
+      });
       return null;
     }
   }

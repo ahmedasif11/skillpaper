@@ -119,7 +119,7 @@ export function transformResumeDataForTemplate(
     const expAchievements = exp.achievements || exp.responsibilities || [];
     return {
       company: exp.company || '',
-      position: exp.position || '',
+      position: exp.position || exp.title || '',
       location: exp.location || '',
       duration:
         exp.duration ||

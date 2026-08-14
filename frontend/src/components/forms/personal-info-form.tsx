@@ -24,7 +24,7 @@ export function PersonalInfoForm({ data, onChange }: PersonalInfoFormProps) {
           <Label htmlFor="name">Full Name *</Label>
           <Input
             id="name"
-            value={data.name}
+            value={data?.name ?? ''}
             onChange={(e) => handleChange('name', e.target.value)}
             placeholder="John Doe"
             required
@@ -35,7 +35,7 @@ export function PersonalInfoForm({ data, onChange }: PersonalInfoFormProps) {
           <Input
             id="email"
             type="email"
-            value={data.email}
+            value={data?.email ?? ''}
             onChange={(e) => handleChange('email', e.target.value)}
             placeholder="john.doe@email.com"
             required
@@ -49,7 +49,7 @@ export function PersonalInfoForm({ data, onChange }: PersonalInfoFormProps) {
           <Input
             id="phone"
             type="tel"
-            value={data.phone}
+            value={data?.phone ?? ''}
             onChange={(e) => handleChange('phone', e.target.value)}
             placeholder="+1 (555) 123-4567"
             required
@@ -59,7 +59,7 @@ export function PersonalInfoForm({ data, onChange }: PersonalInfoFormProps) {
           <Label htmlFor="location">Location *</Label>
           <Input
             id="location"
-            value={data.location}
+            value={data?.location ?? ''}
             onChange={(e) => handleChange('location', e.target.value)}
             placeholder="San Francisco, CA"
             required
@@ -113,7 +113,7 @@ export function PersonalInfoForm({ data, onChange }: PersonalInfoFormProps) {
         <Label htmlFor="summary">Professional Summary *</Label>
         <Textarea
           id="summary"
-          value={data.summary}
+          value={data?.summary ?? ''}
           onChange={(e) => handleChange('summary', e.target.value)}
           placeholder="Write a brief summary of your professional background and career objectives..."
           className="min-h-[120px]"
