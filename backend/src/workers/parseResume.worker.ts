@@ -6,11 +6,19 @@ import {
   getStorage,
   getTextExtractor,
 } from '../container';
+import { isExtractError } from '../interfaces/ExtractError';
 import type { ParseJobPayload, ResumeMime } from '../interfaces/types';
 import {
   computeConfidenceScore,
   validateAndNormalise,
 } from '../services/resumeParser.normalise';
+
+export const PARSE_ERROR_ENCRYPTED_PDF =
+  'This PDF is password-protected. Remove the password and upload it again.';
+export const PARSE_ERROR_UNREADABLE_PDF =
+  'This PDF is unreadable or damaged. Upload a valid file or enter details manually.';
+export const PARSE_ERROR_NO_TEXT =
+  'No extractable text found. You can retry with a different file or enter details manually.';
 
 function sha256(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex');
@@ -73,9 +81,8 @@ export async function runParseJob(payload: ParseJobPayload): Promise<void> {
     const extracted = await getTextExtractor().extract({ buffer, mimeType });
     if (!extracted.text.trim()) {
       doc.status = 'failed:parse';
-      doc.parseError = extracted.isLikelyScannedPdf
-        ? 'No extractable text found. Scanned or encrypted files are not supported yet.'
-        : 'No extractable text found in this file.';
+      doc.parseError = PARSE_ERROR_NO_TEXT;
+      doc.isOcrExtracted = false;
       await doc.save();
       return;
     }
@@ -89,10 +96,24 @@ export async function runParseJob(payload: ParseJobPayload): Promise<void> {
     doc.fileHash = fileHash;
     doc.parsedAt = new Date();
     doc.parseError = null;
-    doc.isOcrExtracted = false;
+    doc.isOcrExtracted = extracted.isOcrExtracted === true;
     doc.status = 'ready';
     await doc.save();
   } catch (err) {
+    if (isExtractError(err) && err.code === 'encrypted_pdf') {
+      doc.status = 'failed:parse';
+      doc.parseError = PARSE_ERROR_ENCRYPTED_PDF;
+      doc.isOcrExtracted = false;
+      await doc.save();
+      return;
+    }
+    if (isExtractError(err) && err.code === 'unreadable_pdf') {
+      doc.status = 'failed:parse';
+      doc.parseError = PARSE_ERROR_UNREADABLE_PDF;
+      doc.isOcrExtracted = false;
+      await doc.save();
+      return;
+    }
     console.error('Parse pipeline failed', payload.uploadedResumeId, err);
     const scanning = doc.status === 'scanning';
     doc.status = scanning ? 'failed:scan' : 'failed:parse';

@@ -10,6 +10,7 @@ export class MockExtractorAdapter implements ITextExtractor {
       text: 'Mock extracted resume text.',
       pageCount: 1,
       isLikelyScannedPdf: false,
+      isOcrExtracted: false,
     };
   }
 }

@@ -12,6 +12,7 @@ import { MockStorageAdapter } from './adapters/storage/mockStorage.adapter';
 import { ClamavScannerAdapter } from './adapters/scanner/clamavScanner.adapter';
 import { MockScannerAdapter } from './adapters/scanner/mockScanner.adapter';
 import { PdfMammothExtractorAdapter } from './adapters/extract/pdfMammothExtractor.adapter';
+import { createTesseractPdfOcr } from './adapters/extract/tesseractPdfOcr';
 import { MockExtractorAdapter } from './adapters/extract/mockExtractor.adapter';
 import { BullmqQueueAdapter } from './adapters/queue/bullmqQueue.adapter';
 import { InMemoryQueueAdapter } from './adapters/queue/inMemoryQueue.adapter';
@@ -118,7 +119,9 @@ export function getTextExtractor(): ITextExtractor {
         extractor = new MockExtractorAdapter();
         break;
       case 'pdf-mammoth':
-        extractor = new PdfMammothExtractorAdapter();
+        extractor = new PdfMammothExtractorAdapter({
+          ocrPdf: createTesseractPdfOcr(),
+        });
         break;
       default:
         throw new Error(
@@ -164,6 +167,10 @@ export function startParseWorker(): void {
       q.startWorker(runParseJob);
     });
   }
+}
+
+export function setTextExtractorForTests(instance: ITextExtractor): void {
+  extractor = instance;
 }
 
 export function resetContainerForTests(): void {

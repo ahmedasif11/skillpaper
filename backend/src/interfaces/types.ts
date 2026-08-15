@@ -25,6 +25,7 @@ export interface ExtractResult {
   text: string;
   pageCount?: number;
   isLikelyScannedPdf: boolean;
+  isOcrExtracted: boolean;
 }
 
 export interface ParseJobPayload {
