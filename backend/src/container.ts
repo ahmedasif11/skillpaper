@@ -16,10 +16,27 @@ import { MockExtractorAdapter } from './adapters/extract/mockExtractor.adapter';
 import { BullmqQueueAdapter } from './adapters/queue/bullmqQueue.adapter';
 import { InMemoryQueueAdapter } from './adapters/queue/inMemoryQueue.adapter';
 
+function envValue(name: string): string | undefined {
+  const v = process.env[name]?.trim();
+  return v ? v : undefined;
+}
+
 function requireEnv(name: string): string {
-  const v = process.env[name];
+  const v = envValue(name);
   if (!v) throw new Error(`Missing env ${name}`);
   return v;
+}
+
+function resolveLlmProvider(): string {
+  const explicit = envValue('LLM_PROVIDER');
+  if (explicit === 'gemini' && !envValue('GEMINI_API_KEY')) {
+    console.warn(
+      'GEMINI_API_KEY is missing; falling back to mock LLM so resume import still works'
+    );
+    return 'mock';
+  }
+  if (explicit) return explicit;
+  return envValue('GEMINI_API_KEY') ? 'gemini' : 'mock';
 }
 
 let llm: ILlmService | undefined;
@@ -30,7 +47,7 @@ let queue: IQueueService | undefined;
 
 export function getLlm(): ILlmService {
   if (!llm) {
-    switch (process.env.LLM_PROVIDER ?? 'gemini') {
+    switch (resolveLlmProvider()) {
       case 'mock':
         llm = new MockLlmAdapter();
         break;
@@ -137,9 +154,7 @@ export function getQueue(): IQueueService {
 }
 
 export function startParseWorker(): void {
-  if ((process.env.LLM_PROVIDER ?? 'gemini') === 'gemini') {
-    requireEnv('GEMINI_API_KEY');
-  }
+  resolveLlmProvider();
   if ((process.env.QUEUE_PROVIDER ?? 'bullmq') !== 'bullmq') {
     return;
   }

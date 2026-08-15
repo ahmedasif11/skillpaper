@@ -45,4 +45,11 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `No route for ${req.method} ${req.path}`,
+  });
+});
+
 export default app;

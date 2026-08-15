@@ -42,34 +42,34 @@ export async function runParseJob(payload: ParseJobPayload): Promise<void> {
   doc.parseError = null;
   await doc.save();
 
-  const scanner = getScanner();
-  const mimeType = doc.mimeType as ResumeMime;
-  const scan = await scanner.scan({ buffer, mimeType });
-
-  if (!scan.safe) {
-    try {
-      await storage.delete(payload.objectKey);
-    } catch (err) {
-      console.error('Failed to delete unsafe object', payload.objectKey, err);
-    }
-    doc.status = 'failed:scan';
-    doc.parseError = 'File blocked: potential security threat detected';
-    doc.parsedData = null;
-    doc.confidenceScore = null;
-    doc.parsedAt = null;
-    await doc.save();
-    console.warn('Malware detected on uploaded resume', {
-      userId: payload.userId,
-      uploadedResumeId: payload.uploadedResumeId,
-    });
-    return;
-  }
-
-  doc.status = 'parsing';
-  doc.fileHash = fileHash;
-  await doc.save();
-
   try {
+    const scanner = getScanner();
+    const mimeType = doc.mimeType as ResumeMime;
+    const scan = await scanner.scan({ buffer, mimeType });
+
+    if (!scan.safe) {
+      try {
+        await storage.delete(payload.objectKey);
+      } catch (err) {
+        console.error('Failed to delete unsafe object', payload.objectKey, err);
+      }
+      doc.status = 'failed:scan';
+      doc.parseError = 'File blocked: potential security threat detected';
+      doc.parsedData = null;
+      doc.confidenceScore = null;
+      doc.parsedAt = null;
+      await doc.save();
+      console.warn('Malware detected on uploaded resume', {
+        userId: payload.userId,
+        uploadedResumeId: payload.uploadedResumeId,
+      });
+      return;
+    }
+
+    doc.status = 'parsing';
+    doc.fileHash = fileHash;
+    await doc.save();
+
     const extracted = await getTextExtractor().extract({ buffer, mimeType });
     if (!extracted.text.trim()) {
       doc.status = 'failed:parse';
@@ -94,8 +94,11 @@ export async function runParseJob(payload: ParseJobPayload): Promise<void> {
     await doc.save();
   } catch (err) {
     console.error('Parse pipeline failed', payload.uploadedResumeId, err);
-    doc.status = 'failed:parse';
-    doc.parseError = 'Failed to parse resume. You can retry or enter details manually.';
+    const scanning = doc.status === 'scanning';
+    doc.status = scanning ? 'failed:scan' : 'failed:parse';
+    doc.parseError = scanning
+      ? 'Security scan is unavailable. Retry in a minute, or enter details manually.'
+      : 'Failed to parse resume. You can retry or enter details manually.';
     await doc.save();
   }
 }

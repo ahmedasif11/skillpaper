@@ -1,8 +1,7 @@
 // src/lib/api.ts
 import axios, { AxiosError, AxiosResponse } from 'axios';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -88,7 +87,8 @@ api.interceptors.response.use(
             'Access denied. You do not have permission to perform this action.';
           break;
         case 404:
-          apiError.message = 'The requested resource was not found.';
+          apiError.message =
+            data.message || 'The requested resource was not found.';
           break;
         case 410:
           apiError.message = 'This shared link has expired.';

@@ -2,9 +2,11 @@
   "name": "skillpaper",
   "private": true,
   "scripts": {
-    "infra:up": "docker compose up -d --build",
-    "infra:down": "docker compose down",
-    "infra:logs": "docker compose logs -f",
+    "infra:up": "docker compose up -d --build mongo redis minio clamav opencv-service",
+    "infra:down": "docker compose stop mongo redis minio clamav opencv-service",
+    "infra:logs": "docker compose logs -f mongo redis minio clamav opencv-service",
+    "app:up": "docker compose up -d --build",
+    "app:down": "docker compose down",
     "db:up": "docker compose up -d mongo",
     "db:down": "docker compose stop mongo"
   }
