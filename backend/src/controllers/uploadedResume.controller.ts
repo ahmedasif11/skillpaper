@@ -28,6 +28,8 @@ const PARSE_STATUSES: ParseStatus[] = [
   'failed:parse',
 ];
 
+const DOWNLOAD_URL_EXPIRES_SECONDS = 3600;
+
 function fail(
   res: Response,
   status: number,
@@ -336,6 +338,77 @@ export const getUploadedResumeStatus = async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error('Get uploaded resume status error:', err);
+    return fail(res, 500, 'Server error');
+  }
+};
+
+/**
+ * PUT /api/uploaded-resumes/:id
+ */
+export const updateUploadedResumeLabel = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const doc = await loadOwnedUploadedResume(req, res);
+    if (!doc) return;
+
+    const rawLabel = req.body?.label;
+    if (typeof rawLabel !== 'string') {
+      return fail(res, 400, 'Label is required');
+    }
+    const label = rawLabel.trim();
+    if (!label) {
+      return fail(res, 400, 'Label is required');
+    }
+    if (label.length > 100) {
+      return fail(res, 400, 'Label must be at most 100 characters');
+    }
+
+    doc.label = label;
+    await doc.save();
+
+    return res.json({
+      success: true,
+      data: {
+        id: String(doc._id),
+        label: doc.label,
+        updatedAt: doc.updatedAt,
+      },
+    });
+  } catch (err) {
+    console.error('Update uploaded resume label error:', err);
+    return fail(res, 500, 'Server error');
+  }
+};
+
+/**
+ * GET /api/uploaded-resumes/:id/download
+ */
+export const downloadUploadedResume = async (req: Request, res: Response) => {
+  try {
+    const doc = await loadOwnedUploadedResume(req, res);
+    if (!doc) return;
+
+    try {
+      const url = await getStorage().presignGet(
+        doc.minioKey,
+        DOWNLOAD_URL_EXPIRES_SECONDS
+      );
+      return res.json({
+        success: true,
+        data: {
+          url,
+          expiresIn: DOWNLOAD_URL_EXPIRES_SECONDS,
+          filename: doc.filename,
+        },
+      });
+    } catch (err) {
+      console.error('Storage presignGet failed', doc.minioKey, err);
+      return fail(res, 500, 'Failed to generate download URL', 'STORAGE_ERROR');
+    }
+  } catch (err) {
+    console.error('Download uploaded resume error:', err);
     return fail(res, 500, 'Server error');
   }
 };

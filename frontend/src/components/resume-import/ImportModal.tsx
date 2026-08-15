@@ -39,6 +39,8 @@ export function ImportModal({
     isLoading,
     error,
     upload,
+    rename,
+    download,
     deleteResume,
     reparse,
     refetch,
@@ -202,6 +204,24 @@ export function ImportModal({
     }
   };
 
+  const handleRename = async (resume: UploadedResume, label: string) => {
+    try {
+      await rename(resume.id, label);
+      toast.success('Resume renamed.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not rename resume');
+      throw err;
+    }
+  };
+
+  const handleDownload = async (resume: UploadedResume) => {
+    try {
+      await download(resume.id);
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not download resume');
+    }
+  };
+
   const readyCount = resumes.filter((item) => item.status === 'ready').length;
 
   return (
@@ -214,7 +234,7 @@ export function ImportModal({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
-        <Dialog.Content className="fixed z-50 bg-background border shadow-lg p-6 overflow-y-auto inset-0 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-h-[85vh] sm:rounded-lg">
+        <Dialog.Content className="fixed z-50 bg-background border shadow-lg p-6 overflow-y-auto inset-0 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-2xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-h-[85vh] sm:rounded-lg">
           <div className="flex items-start justify-between gap-3 mb-4">
             <Dialog.Title className="text-lg font-semibold">
               Import from Resume
@@ -258,6 +278,8 @@ export function ImportModal({
                     resumes={resumes}
                     variant="select"
                     onSelect={loadPreview}
+                    onRename={handleRename}
+                    onDownload={handleDownload}
                     onDelete={handleDelete}
                     onRetry={handleRetry}
                     onStatusChange={(id, status) => {

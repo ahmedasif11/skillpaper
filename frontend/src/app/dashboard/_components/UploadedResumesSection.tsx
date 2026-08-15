@@ -22,6 +22,8 @@ export function UploadedResumesSection() {
     isLoading,
     error,
     upload,
+    rename,
+    download,
     deleteResume,
     reparse,
     refetch,
@@ -56,6 +58,24 @@ export function UploadedResumesSection() {
       toast.info('Re-parse started.');
     } catch (err: any) {
       toast.error(err?.message || 'Could not start re-parse');
+    }
+  };
+
+  const handleRename = async (resume: UploadedResume, label: string) => {
+    try {
+      await rename(resume.id, label);
+      toast.success('Resume renamed.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not rename resume');
+      throw err;
+    }
+  };
+
+  const handleDownload = async (resume: UploadedResume) => {
+    try {
+      await download(resume.id);
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not download resume');
     }
   };
 
@@ -114,6 +134,8 @@ export function UploadedResumesSection() {
           resumes={resumes}
           variant="dashboard"
           onUseInForm={handleUseInForm}
+          onRename={handleRename}
+          onDownload={handleDownload}
           onDelete={handleDelete}
           onRetry={handleRetry}
           onStatusChange={(id, status) => {

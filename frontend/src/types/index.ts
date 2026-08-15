@@ -350,3 +350,9 @@ export interface UploadedResumeParsedPayload {
   isOcrExtracted: boolean;
   parsedAt: string | null;
 }
+
+export interface UploadedResumeDownload {
+  url: string;
+  expiresIn: number;
+  filename: string;
+}

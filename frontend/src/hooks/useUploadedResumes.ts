@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiError, uploadedResumesAPI } from '@/lib/api';
 import {
   UploadedResume,
+  UploadedResumeDownload,
   UploadedResumeParsedPayload,
 } from '@/types';
 
@@ -59,6 +60,30 @@ export function useUploadedResumes(enabled = true) {
     []
   );
 
+  const rename = useCallback(async (id: string, label: string) => {
+    const response = await uploadedResumesAPI.updateLabel(id, label);
+    const next = response.data as { label?: string; updatedAt?: string };
+    setResumes((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              label: next?.label ?? label.trim(),
+              updatedAt: next?.updatedAt ?? item.updatedAt,
+            }
+          : item
+      )
+    );
+    return next;
+  }, []);
+
+  const download = useCallback(async (id: string) => {
+    const response = await uploadedResumesAPI.download(id);
+    const payload = (response?.data ?? response) as UploadedResumeDownload;
+    await openOrSaveFile(payload.url, payload.filename);
+    return payload;
+  }, []);
+
   const remove = useCallback(async (id: string) => {
     await uploadedResumesAPI.delete(id);
     setResumes((prev) => prev.filter((item) => item.id !== id));
@@ -99,6 +124,8 @@ export function useUploadedResumes(enabled = true) {
     isLoading,
     error,
     upload,
+    rename,
+    download,
     deleteResume: remove,
     reparse,
     refetch,
@@ -106,4 +133,22 @@ export function useUploadedResumes(enabled = true) {
     patchResume,
     apiError: error as unknown as ApiError | null,
   };
+}
+
+async function openOrSaveFile(url: string, filename: string) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Download failed');
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
 }

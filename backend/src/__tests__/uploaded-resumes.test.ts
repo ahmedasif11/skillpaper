@@ -331,3 +331,92 @@ describe('Uploaded resume parse APIs (Phase 2)', () => {
     expect(data.body.data.parsedData.name).toBe('Jane Doe');
   });
 });
+
+describe('Uploaded resume rename and download (Phase 4 slice)', () => {
+  it('PUT :id as owner → 200 with updated label only', async () => {
+    const { res: ownerRes } = await registerUser(app);
+    const token = ownerRes.body.token;
+    const created = await uploadPdf(token, { label: 'Old Label' });
+    const id = created.body.data.id;
+    const before = await UploadedResume.findById(id);
+
+    const renamed = await request(app)
+      .put(`/api/uploaded-resumes/${id}`)
+      .set(authHeader(token))
+      .send({ label: '  New Resume Label  ' });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.success).toBe(true);
+    expect(renamed.body.data).toMatchObject({
+      id,
+      label: 'New Resume Label',
+    });
+    expect(renamed.body.data.updatedAt).toBeDefined();
+
+    const after = await UploadedResume.findById(id);
+    expect(after?.label).toBe('New Resume Label');
+    expect(after?.filename).toBe(before?.filename);
+    expect(after?.minioKey).toBe(before?.minioKey);
+    expect(after?.fileHash).toBe(before?.fileHash);
+    expect(after?.status).toBe(before?.status);
+  });
+
+  it('PUT :id as another user → 403', async () => {
+    const { res: ownerRes } = await registerUser(app);
+    const created = await uploadPdf(ownerRes.body.token, { label: 'Mine' });
+    const { res: otherRes } = await registerUser(app, {
+      name: 'Bob Intruder',
+      email: 'bob@example.com',
+      password: 'other-password',
+    });
+
+    const denied = await request(app)
+      .put(`/api/uploaded-resumes/${created.body.data.id}`)
+      .set(authHeader(otherRes.body.token))
+      .send({ label: 'Hijacked' });
+    expect(denied.status).toBe(403);
+
+    const doc = await UploadedResume.findById(created.body.data.id);
+    expect(doc?.label).toBe('Mine');
+  });
+
+  it('PUT :id invalid id → 400', async () => {
+    const { res: ownerRes } = await registerUser(app);
+    const res = await request(app)
+      .put('/api/uploaded-resumes/not-an-objectid')
+      .set(authHeader(ownerRes.body.token))
+      .send({ label: 'Anything' });
+    expect(res.status).toBe(400);
+  });
+
+  it('GET :id/download as owner → 200 with url, expiresIn, filename', async () => {
+    const { res: ownerRes } = await registerUser(app);
+    const token = ownerRes.body.token;
+    const created = await uploadPdf(token, { filename: 'cv.pdf' });
+    const id = created.body.data.id;
+
+    const downloaded = await request(app)
+      .get(`/api/uploaded-resumes/${id}/download`)
+      .set(authHeader(token));
+    expect(downloaded.status).toBe(200);
+    expect(downloaded.body.success).toBe(true);
+    expect(downloaded.body.data.filename).toBe('cv.pdf');
+    expect(downloaded.body.data.expiresIn).toBe(3600);
+    expect(typeof downloaded.body.data.url).toBe('string');
+    expect(downloaded.body.data.url.length).toBeGreaterThan(0);
+  });
+
+  it('GET :id/download as another user → 403', async () => {
+    const { res: ownerRes } = await registerUser(app);
+    const created = await uploadPdf(ownerRes.body.token);
+    const { res: otherRes } = await registerUser(app, {
+      name: 'Bob Intruder',
+      email: 'bob@example.com',
+      password: 'other-password',
+    });
+
+    const denied = await request(app)
+      .get(`/api/uploaded-resumes/${created.body.data.id}/download`)
+      .set(authHeader(otherRes.body.token));
+    expect(denied.status).toBe(403);
+  });
+});
