@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "NEXT_TELEMETRY_DISABLED=1 next build",
     "start": "next start",
     "lint": "eslint"
   },
@@ -43,7 +43,7 @@
     "handlebars": "^4.7.9",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.487.0",
-    "next": "15.5.4",
+    "next": "15.5.18",
     "next-themes": "^0.4.6",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
@@ -63,7 +63,7 @@
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.21",
     "eslint": "^9",
-    "eslint-config-next": "15.5.4",
+    "eslint-config-next": "15.5.18",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.0",
     "typescript": "^5"

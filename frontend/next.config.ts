@@ -1,9 +1,14 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const apiOrigin = process.env.API_INTERNAL_URL || "http://localhost:5000";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Docker/self-host needs standalone. Vercel sets VERCEL=1 and uses its own
+  // output tracing; standalone there can stall or OOM during "Collecting build traces".
+  ...(!process.env.VERCEL ? { output: "standalone" as const } : {}),
+  outputFileTracingRoot: path.join(__dirname),
+  serverExternalPackages: ["handlebars"],
   async rewrites() {
     return [
       {
@@ -17,14 +22,6 @@ const nextConfig: NextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true,
-  },
-  webpack: (config) => {
-    // Handlebars package root uses require.extensions; point at the CJS build for the browser.
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      handlebars: "handlebars/dist/cjs/handlebars.js",
-    };
-    return config;
   },
 };
 
